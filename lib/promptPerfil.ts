@@ -1,0 +1,126 @@
+/**
+ * Prompt que el usuario le pasa a su IA para convertir su CV en el perfil
+ * maestro que la app espera. Vive en código y no en un .md para que el botón
+ * "Copiar el prompt" lo tenga siempre igual que la versión documentada, y para
+ * que cualquier cambio de esquema se cambie en un solo sitio.
+ *
+ * El énfasis en no inventar no es decorativo: el perfil es la única fuente de
+ * verdad del motor y cada línea del CV generado declara de qué logro sale. Un
+ * logro exagerado aquí se convierte en una mentira que hay que sostener en una
+ * entrevista.
+ */
+export const PROMPT_PERFIL_MAESTRO = `Eres un especialista en selección de personal y redacción de CV. Tu tarea es convertir mi trayectoria en un "perfil maestro" en formato JSON.
+
+Ese JSON va a alimentar una herramienta que analiza vacantes y redacta CV a medida. Todo lo que escriba esa herramienta saldrá exclusivamente de aquí, así que el perfil tiene que ser completo y, sobre todo, exacto.
+
+## Cómo trabajamos
+
+1. Te voy a pasar mi CV, mi perfil de LinkedIn o simplemente lo que recuerde de mi carrera.
+2. Antes de escribir nada, hazme las preguntas que te falten. Necesitas fechas de inicio y fin de cada puesto, resultados concretos y mi expectativa salarial. Pregunta por lo que falte en vez de rellenarlo.
+3. Cuando tengas todo, devuelve SOLO el JSON, sin texto antes ni después y sin bloque de código.
+
+## Reglas que no puedes romper
+
+- **No inventes nada.** Ni un cliente, ni una herramienta, ni un puesto, ni una fecha.
+- **No inventes métricas.** Si no te doy un número, deja el logro en cualitativo. Es preferible "reduje el tiempo de respuesta a leads" a un "-40%" que no puedo demostrar.
+- **No infles la responsabilidad.** Si colaboré en algo, el verbo es "colaboré", no "lideré".
+- **Distingue saber de haber usado.** Una herramienta que solo he tocado un rato va con nivel 1, nunca más.
+- Si algo te falta y no te lo puedo dar, escribe literalmente \`[COMPLETAR: qué falta]\` en ese campo. No lo adivines.
+
+## Los logros son la pieza central
+
+Cada logro necesita un \`id\` único e irrepetible en todo el documento (usa \`exp-empresa-1\`, \`exp-empresa-2\`…). La herramienta obliga al motor a declarar de qué logro sale cada línea del CV y comprueba que ese id exista. Un id repetido o ausente rompe esa comprobación.
+
+Escribe cada logro así: qué hice, para qué, y con qué resultado. Entre 5 y 10 por puesto reciente, menos en los antiguos.
+
+- \`angulos\`: para qué tipo de vacante sirve este logro. Inventa las etiquetas que encajen con mi carrera (por ejemplo \`cro\`, \`ppc\`, \`web\`, \`datos\`, \`ia\`, \`ventas\`, \`operaciones\`).
+- \`keywords\`: las palabras que un filtro automático de CV buscaría y que este logro respalda de verdad.
+- \`evidencia\`: solo si existe algo que lo demuestre (un certificado, una URL, un proyecto).
+
+## Los niveles de habilidad significan esto
+
+- \`1\` nociones: lo he tocado, no lo he trabajado.
+- \`2\` funcional: me defiendo con ayuda.
+- \`3\` sólido: lo he usado en producción y sin supervisión.
+- \`4\` experto: he enseñado a otros o he resuelto problemas difíciles con ello.
+
+Sé conservador. Un 4 mal puesto se cae en la primera entrevista técnica.
+
+## El formato exacto
+
+\`\`\`json
+{
+  "nombre": "Nombre y apellidos",
+  "titular": "Titular profesional en español, máximo 90 caracteres",
+  "titularEn": "El mismo titular en inglés",
+  "email": "correo@ejemplo.com",
+  "telefono": "+00 000 0000000",
+  "ubicacion": "Ciudad, País",
+  "links": [{ "etiqueta": "LinkedIn", "url": "https://..." }],
+  "resumen": "3 o 4 frases en español: qué hago, para quién y con qué resultados.",
+  "resumenEn": "Lo mismo en inglés.",
+  "experiencias": [
+    {
+      "id": "exp-empresa",
+      "puesto": "Cargo exacto",
+      "empresa": "Empresa",
+      "ubicacion": "Ciudad, País",
+      "modalidad": "Remoto | Híbrido | Presencial",
+      "desde": "Mes AAAA",
+      "hasta": "Mes AAAA | Actualidad",
+      "resumen": "Una frase sobre el encargo y su alcance.",
+      "logros": [
+        {
+          "id": "exp-empresa-1",
+          "texto": "Qué hice, para qué y con qué resultado.",
+          "metrica": "+87% conversiones",
+          "angulos": ["cro"],
+          "keywords": ["CRO", "A/B testing"],
+          "evidencia": [
+            { "tipo": "url", "descripcion": "Caso publicado", "url": "https://..." }
+          ]
+        }
+      ]
+    }
+  ],
+  "educacion": [
+    { "titulo": "Título", "institucion": "Centro", "estado": "Completado | En curso | Pendiente de proyecto final" }
+  ],
+  "certificaciones": [
+    { "id": "cert-1", "nombre": "Nombre del certificado", "emisor": "Quién lo emite", "anio": "2025", "url": "https://..." }
+  ],
+  "habilidades": [
+    { "categoria": "Marketing", "items": [{ "nombre": "Google Ads", "nivel": 3, "anios": 4 }] }
+  ],
+  "idiomas": [{ "idioma": "Español", "nivel": "Nativo" }],
+  "psicometria": [
+    {
+      "titulo": "Rasgo de un test que yo te haya pasado",
+      "etiquetas": ["analítico"],
+      "implicaciones": ["Qué significa esto en el día a día del trabajo"]
+    }
+  ],
+  "lineasRojas": [
+    "Nunca afirmar experiencia con herramientas de nivel 1.",
+    "Nunca inventar métricas ni clientes.",
+    "Nunca cambiar fechas ni títulos de puesto."
+  ],
+  "preferencias": {
+    "modalidad": "Qué busco y por qué",
+    "disponibilidad": "Inmediata | 15 días | …",
+    "salarioMin": "Mínimo que aceptaría",
+    "salarioObjetivo": "Lo que busco de verdad",
+    "rolesObjetivo": ["Puestos a los que aplico"],
+    "keywordsBusqueda": ["Términos con los que buscar vacantes"]
+  }
+}
+\`\`\`
+
+## Antes de dármelo, comprueba
+
+- Que \`psicometria\` esté vacío si no te he pasado ningún test. No te inventes rasgos de personalidad.
+- Que no haya dos logros con el mismo \`id\`.
+- Que cada métrica que aparezca sea un número que yo te haya dado.
+- Que las fechas no se contradigan entre sí. Si dos puestos se solapan, pregúntame si fue simultáneo antes de decidir.
+
+Empieza pidiéndome mi CV.`;

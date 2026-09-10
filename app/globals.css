@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fondo: #0b0f17;
+  --color-panel: #131926;
+  --color-panel2: #1a2233;
+  --color-borde: #24304a;
+  --color-texto: #e6edf7;
+  --color-suave: #93a3bd;
+  --color-acento: #4f8cff;
+  --color-acento2: #22d3a6;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-borde) transparent;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-[var(--color-borde)] bg-[var(--color-panel)];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-borde)]
+      bg-[var(--color-panel2)] px-3 py-2 text-sm font-medium text-[var(--color-texto)]
+      transition hover:border-[var(--color-acento)] hover:bg-[#212c42]
+      disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-[var(--color-borde)];
+  }
+  .btn-primario {
+    @apply border-transparent bg-[var(--color-acento)] text-white hover:bg-[#3f7cf0];
+  }
+  .btn-peligro {
+    @apply border-transparent bg-rose-600/90 text-white hover:bg-rose-600;
+  }
+  .campo {
+    @apply w-full rounded-lg border border-[var(--color-borde)] bg-[#0e131e] px-3 py-2 text-sm
+      text-[var(--color-texto)] outline-none transition placeholder:text-[#5b6a84]
+      focus:border-[var(--color-acento)];
+  }
+  .etiqueta {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-suave)];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-[var(--color-borde)]
+      bg-[var(--color-panel2)] px-2.5 py-1 text-xs font-medium;
+  }
+}
+
+/* Ancla el foco visible sin depender del navegador */
+:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+}

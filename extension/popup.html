@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Manager</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        width: 316px;
+        margin: 0;
+        padding: 14px;
+        background: #131926;
+        color: #e6edf7;
+        font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 14px;
+      }
+      p.sub {
+        margin: 0 0 12px;
+        color: #93a3bd;
+        font-size: 11.5px;
+      }
+      label {
+        display: block;
+        margin-bottom: 4px;
+        color: #93a3bd;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 7px 9px;
+        border: 1px solid #24304a;
+        border-radius: 7px;
+        background: #0e131e;
+        color: #e6edf7;
+        font-size: 12px;
+      }
+      input:focus {
+        border-color: #4f8cff;
+        outline: none;
+      }
+      button {
+        width: 100%;
+        margin-top: 10px;
+        padding: 9px;
+        border: 0;
+        border-radius: 7px;
+        background: #4f8cff;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #3f7cf0;
+      }
+      button.sec {
+        background: #1a2233;
+        border: 1px solid #24304a;
+        color: #e6edf7;
+        font-weight: 500;
+      }
+      #estado {
+        margin-top: 9px;
+        min-height: 16px;
+        font-size: 11.5px;
+      }
+      .ok {
+        color: #34d399;
+      }
+      .err {
+        color: #fb7185;
+      }
+      .info {
+        color: #93a3bd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Job Manager</h1>
+    <p class="sub">Captura la oferta que tienes abierta y ábrela en tu panel.</p>
+
+    <label for="app">URL de tu Job Manager</label>
+    <input id="app" type="url" placeholder="https://tu-app.vercel.app" />
+
+    <button id="capturar">Capturar esta vacante</button>
+    <button id="guardar" class="sec">Guardar URL</button>
+
+    <div id="estado"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
