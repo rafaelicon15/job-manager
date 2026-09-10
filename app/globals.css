@@ -61,3 +61,108 @@ body {
   outline: 2px solid var(--color-acento);
   outline-offset: 2px;
 }
+
+/* ------------------------------------------------------------- movimiento
+
+   Animaciones cortas y baratas: solo `transform` y `opacity`, que el
+   navegador compone en la GPU sin recalcular el diseño. Nada de animar
+   `height`, `top` ni `box-shadow`, que provocan reflow y se notan en un
+   portátil modesto.
+
+   Todo va envuelto en una consulta de movimiento reducido: quien lo tenga
+   desactivado en su sistema (por mareo, migraña o simple preferencia) verá
+   la app exactamente igual, pero quieta. Es un ajuste real del sistema
+   operativo, no un capricho.
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes entrar-escala {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Entrada del contenido de cada pantalla. */
+  .aparece {
+    animation: aparecer 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Listas: cada fila entra un pelín después que la anterior. El retardo lo
+     pone el componente con --i, y se corta a los 12 elementos para que una
+     lista de 150 vacantes no tarde una eternidad en terminar de dibujarse. */
+  .aparece-escalonado > * {
+    animation: aparecer 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 35ms);
+  }
+
+  .entra {
+    animation: entrar-escala 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Las tarjetas se levantan un poco al pasar por encima. */
+  .panel-interactivo {
+    transition:
+      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.18s ease;
+  }
+  .panel-interactivo:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Al pulsar, el botón cede: da la sensación de que respondió al instante
+     aunque la respuesta del servidor tarde. */
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn {
+    transition:
+      transform 0.1s ease,
+      border-color 0.18s ease,
+      background-color 0.18s ease;
+  }
+
+  /* Iconos que reaccionan al pasar por encima, sin librería extra.
+     El disparador es cualquier cosa pulsable, no solo .btn: la mitad de estos
+     iconos viven en enlaces, y limitarlo a los botones los dejaba muertos. */
+  .icono-gira,
+  .icono-avanza,
+  .icono-late {
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  :where(a, button, .btn, [role="button"]):hover .icono-gira {
+    transform: rotate(180deg);
+  }
+  :where(a, button, .btn, [role="button"]):hover .icono-avanza {
+    transform: translateX(3px);
+  }
+  :where(a, button, .btn, [role="button"]):hover .icono-late {
+    /* Rebote corto: la curva se pasa de 1 y vuelve. */
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(1.15);
+  }
+}
+
+/* Sin animación, pero sin romper nada: los elementos siguen visibles. */
+@media (prefers-reduced-motion: reduce) {
+  .aparece,
+  .aparece-escalonado > *,
+  .entra {
+    animation: none;
+  }
+}

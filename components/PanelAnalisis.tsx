@@ -72,7 +72,7 @@ export default function PanelAnalisis({ vacante }: { vacante: Vacante }) {
   const v = VEREDICTOS[a.veredicto] ?? VEREDICTOS.dudoso;
 
   return (
-    <div className="space-y-4">
+    <div className="aparece space-y-4">
       {error && <Alerta tipo="error">{error}</Alerta>}
 
       <div className="panel p-5">

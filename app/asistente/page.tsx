@@ -6,7 +6,7 @@ import { Sparkles } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { generarRespuesta, type RespuestaGenerada } from "@/lib/gemini";
 import type { Idioma, Vacante } from "@/lib/types";
-import { Alerta, BotonCopiar, Cargando } from "@/components/ui";
+import { Alerta, BotonCopiar, Cargando, EsqueletoPaneles } from "@/components/ui";
 
 const TONOS = [
   "Profesional y directo",
@@ -84,7 +84,7 @@ export default function Asistente() {
     [idVacante, estado.vacantes, estado.perfil.titular]
   );
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoPaneles />;
 
   async function responder() {
     if (!pregunta.trim()) return;
@@ -226,7 +226,7 @@ export default function Asistente() {
             onClick={responder}
             disabled={cargando || !pregunta.trim()}
           >
-            <Sparkles size={15} />
+            <Sparkles size={15} className="icono-late" />
             {cargando ? "Redactando…" : "Responder como yo"}
           </button>
           {cargando && <Cargando texto="Pensando…" />}

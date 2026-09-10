@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { ESTADOS, type EstadoVacante } from "@/lib/types";
-import { Alerta, InsigniaEstado, Vacio } from "@/components/ui";
+import { Alerta, EsqueletoDetalle, InsigniaEstado, Vacio } from "@/components/ui";
 import PanelAnalisis from "@/components/PanelAnalisis";
 import PanelCV from "@/components/PanelCV";
 import PanelCarta from "@/components/PanelCarta";
@@ -61,7 +61,7 @@ export default function FichaVacante({
     (c) => c.vacanteId === id
   );
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoDetalle />;
 
   if (!vacante)
     return (

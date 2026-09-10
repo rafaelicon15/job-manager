@@ -169,7 +169,7 @@ export default function Buscar() {
             onClick={buscar}
             disabled={buscando}
           >
-            <Search size={15} />
+            <Search size={15} className="icono-late" />
             {buscando ? "Buscando…" : "Buscar"}
           </button>
         </div>
@@ -256,7 +256,7 @@ export default function Buscar() {
               {soloBuenas ? "Ver todas" : "Solo encaje ≥ 60"}
             </button>
             <button className="btn btn-primario" onClick={triar} disabled={triando}>
-              <Sparkles size={15} />
+              <Sparkles size={15} className="icono-late" />
               {triando
                 ? progreso.total
                   ? `Puntuando ${progreso.hechas} de ${progreso.total}…`
@@ -287,13 +287,17 @@ export default function Buscar() {
             </div>
           )}
 
-          <ul className="space-y-2.5">
-            {visibles.map((v) => {
+          <ul className="aparece-escalonado space-y-2.5">
+            {visibles.map((v, i) => {
               const p = puntajes[v.id];
               const idGuardada = guardadas[v.id];
               const duplicada = yaGuardadas.has(claveDe(v));
               return (
-                <li key={v.id} className="panel p-4">
+                <li
+                  key={v.id}
+                  className="panel panel-interactivo p-4"
+                  style={{ "--i": i } as React.CSSProperties}
+                >
                   <div className="flex flex-wrap items-start gap-3">
                     {p ? (
                       <Puntaje valor={p.puntaje} />

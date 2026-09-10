@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { CANALES, type Canal } from "@/lib/types";
-import { Modal, Vacio } from "@/components/ui";
+import { EsqueletoLista, Modal, Vacio } from "@/components/ui";
 import NuevaConversacion from "@/components/NuevaConversacion";
 
 const ICONO_CANAL: Record<Canal, string> = {
@@ -40,7 +40,7 @@ function Contenido() {
     [estado.conversaciones, verArchivadas, filtroCanal]
   );
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoLista />;
 
   return (
     <div className="space-y-5">
@@ -98,14 +98,18 @@ function Contenido() {
           }
         />
       ) : (
-        <ul className="space-y-2.5">
-          {visibles.map((c) => {
+        <ul className="aparece-escalonado space-y-2.5">
+          {visibles.map((c, i) => {
             const vacante = estado.vacantes.find((v) => v.id === c.vacanteId);
             const ultimo = c.mensajes[c.mensajes.length - 1];
             const pendientes = c.pendientes.filter((p) => !p.hecho);
             const tocaResponder = ultimo?.de === "ellos";
             return (
-              <li key={c.id} className="panel p-4">
+              <li
+                key={c.id}
+                className="panel panel-interactivo p-4"
+                style={{ "--i": i } as React.CSSProperties}
+              >
                 <div className="flex flex-wrap items-start gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--color-borde)] bg-[var(--color-panel2)] text-[11px] font-bold uppercase text-[var(--color-suave)]">
                     {ICONO_CANAL[c.canal]}
@@ -208,7 +212,7 @@ function Contenido() {
 
 export default function Conversaciones() {
   return (
-    <Suspense fallback={<p className="text-sm text-[var(--color-suave)]">Cargando…</p>}>
+    <Suspense fallback={<EsqueletoLista />}>
       <Contenido />
     </Suspense>
   );

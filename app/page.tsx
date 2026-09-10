@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { ESTADOS } from "@/lib/types";
-import { Alerta, InsigniaEstado, Puntaje, Tarjeta, Vacio } from "@/components/ui";
+import { Alerta, EsqueletoPanel, InsigniaEstado, Puntaje, Tarjeta, Vacio } from "@/components/ui";
 
 export default function Panel() {
   const { estado, listo, exportar, diasSinRespaldo } = useApp();
@@ -67,7 +67,7 @@ export default function Panel() {
 
   const hoy = new Date().toISOString().slice(0, 10);
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoPanel />;
 
   return (
     <div className="space-y-6">
@@ -171,7 +171,7 @@ export default function Panel() {
               href="/vacantes"
               className="inline-flex items-center gap-1 text-xs text-[var(--color-acento)] hover:underline"
             >
-              Ver todas <ArrowRight size={13} />
+              Ver todas <ArrowRight size={13} className="icono-avanza" />
             </Link>
           </div>
           {pendientes.length === 0 ? (
@@ -289,7 +289,7 @@ export default function Panel() {
 
           {vacantes.length > 0 && (
             <button onClick={exportar} className="btn mt-4 w-full">
-              <Download size={15} /> Descargar respaldo (.json)
+              <Download size={15} className="icono-late" /> Descargar respaldo (.json)
             </button>
           )}
         </section>

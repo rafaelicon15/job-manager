@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Download, Eye, EyeOff, ShieldAlert, Upload } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { MODELOS } from "@/lib/gemini";
-import { Alerta } from "@/components/ui";
+import { Alerta, EsqueletoPaneles } from "@/components/ui";
 import EstadoConfiguracion from "@/components/EstadoConfiguracion";
 
 export default function Ajustes() {
@@ -14,7 +14,7 @@ export default function Ajustes() {
   const [mensaje, setMensaje] = useState("");
   const archivoRef = useRef<HTMLInputElement>(null);
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoPaneles />;
 
   async function alImportar(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -285,7 +285,7 @@ export default function Ajustes() {
 
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-primario" onClick={exportar}>
-            <Download size={15} /> Descargar respaldo
+            <Download size={15} className="icono-late" /> Descargar respaldo
           </button>
           <button className="btn" onClick={() => archivoRef.current?.click()}>
             <Upload size={15} /> Importar respaldo

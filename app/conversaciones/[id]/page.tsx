@@ -19,7 +19,7 @@ import { useApp } from "@/lib/contexto";
 import { parsearVacante, redactarEnHilo, type RespuestaHilo } from "@/lib/gemini";
 import { CANALES, type Idioma } from "@/lib/types";
 import { nuevoId } from "@/lib/store";
-import { Alerta, BotonCopiar, Cargando, Modal, Vacio } from "@/components/ui";
+import { Alerta, BotonCopiar, Cargando, EsqueletoDetalle, Modal, Vacio } from "@/components/ui";
 
 const TONOS = [
   "Profesional y directo",
@@ -68,7 +68,7 @@ export default function Hilo({ params }: { params: Promise<{ id: string }> }) {
     [estado.vacantes, conv?.vacanteId]
   );
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoDetalle />;
 
   if (!conv)
     return (
@@ -493,7 +493,7 @@ export default function Hilo({ params }: { params: Promise<{ id: string }> }) {
             onClick={redactar}
             disabled={!!cargando || conv.mensajes.length === 0}
           >
-            <Sparkles size={15} /> Redactar como yo
+            <Sparkles size={15} className="icono-late" /> Redactar como yo
           </button>
           {cargando && <Cargando texto={cargando} />}
         </div>

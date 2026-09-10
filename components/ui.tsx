@@ -183,11 +183,11 @@ export function Modal({
   if (!abierto) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="aparece fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
       onClick={onCerrar}
     >
       <div
-        className={`panel my-8 w-full ${ancho}`}
+        className={`entra panel my-8 w-full ${ancho}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--color-borde)] px-5 py-3.5">
@@ -228,5 +228,151 @@ export function Tarjeta({
         <p className="mt-0.5 text-xs text-[var(--color-suave)]">{detalle}</p>
       )}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- esqueletos
+
+   Lo que se ve mientras la app lee el estado del navegador y mientras Next
+   cambia de pagina. Antes era un "Cargando…" suelto en mitad de la pantalla:
+   funcionaba, pero la pagina daba un salto al aparecer el contenido y en una
+   conexion lenta parecia que la app estaba rota.
+
+   Los esqueletos imitan la forma de cada pantalla, asi que el contenido cae
+   donde ya estaba el hueco. El `aria-hidden` los saca del lector de pantalla,
+   que se entera por el `role="status"` del contenedor.
+-------------------------------------------------------------------------- */
+
+/** Una barra gris que late. `ancho` es una clase de Tailwind. */
+export function Barra({
+  ancho = "w-full",
+  alto = "h-4",
+  className = "",
+}: {
+  ancho?: string;
+  alto?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={`animate-pulse rounded bg-[var(--color-borde)] ${ancho} ${alto} ${className}`}
+    />
+  );
+}
+
+function Marco({ children }: { children: React.ReactNode }) {
+  return (
+    <div role="status" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Cargando…</span>
+      {children}
+    </div>
+  );
+}
+
+function Cabecera() {
+  return (
+    <div className="space-y-2">
+      <Barra ancho="w-52" alto="h-7" />
+      <Barra ancho="w-80" alto="h-3.5" />
+    </div>
+  );
+}
+
+/** Varios paneles apilados. Sirve para casi cualquier pantalla de formulario. */
+export function EsqueletoPaneles({ paneles = 3 }: { paneles?: number }) {
+  return (
+    <Marco>
+      <Cabecera />
+      {Array.from({ length: paneles }).map((_, i) => (
+        <div key={i} className="panel space-y-3 p-5">
+          <Barra ancho="w-40" alto="h-4" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Barra alto="h-9" />
+            <Barra alto="h-9" />
+          </div>
+          <Barra ancho="w-3/4" alto="h-3.5" />
+        </div>
+      ))}
+    </Marco>
+  );
+}
+
+/** El panel de inicio: fila de metricas y dos columnas debajo. */
+export function EsqueletoPanel() {
+  return (
+    <Marco>
+      <Cabecera />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="panel space-y-2 p-4">
+            <Barra ancho="w-24" alto="h-3" />
+            <Barra ancho="w-12" alto="h-7" />
+          </div>
+        ))}
+      </div>
+      <div className="panel space-y-3 p-5">
+        <Barra ancho="w-28" alto="h-4" />
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-9">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Barra key={i} alto="h-14" />
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="panel space-y-3 p-5">
+            <Barra ancho="w-36" alto="h-4" />
+            <Barra alto="h-16" />
+            <Barra alto="h-16" />
+          </div>
+        ))}
+      </div>
+    </Marco>
+  );
+}
+
+/** Listados: vacantes, conversaciones, resultados de busqueda. */
+export function EsqueletoLista({ filas = 4 }: { filas?: number }) {
+  return (
+    <Marco>
+      <Cabecera />
+      <div className="space-y-3">
+        {Array.from({ length: filas }).map((_, i) => (
+          <div key={i} className="panel space-y-2.5 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <Barra ancho="w-2/5" alto="h-4" />
+              <Barra ancho="w-20" alto="h-5" />
+            </div>
+            <Barra ancho="w-1/3" alto="h-3" />
+            <Barra ancho="w-full" alto="h-3" />
+          </div>
+        ))}
+      </div>
+    </Marco>
+  );
+}
+
+/** El detalle de una vacante: cabecera, pestanas y contenido. */
+export function EsqueletoDetalle() {
+  return (
+    <Marco>
+      <div className="space-y-2">
+        <Barra ancho="w-28" alto="h-3.5" />
+        <Barra ancho="w-2/3" alto="h-7" />
+        <Barra ancho="w-1/2" alto="h-3.5" />
+      </div>
+      <div className="flex gap-2 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Barra key={i} ancho="w-24" alto="h-8" />
+        ))}
+      </div>
+      <div className="panel space-y-3 p-5">
+        <Barra ancho="w-44" alto="h-4" />
+        <Barra alto="h-3.5" />
+        <Barra alto="h-3.5" />
+        <Barra ancho="w-4/5" alto="h-3.5" />
+      </div>
+    </Marco>
   );
 }

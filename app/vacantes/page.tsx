@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ExternalLink, LayoutGrid, List, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { ESTADOS, type EstadoVacante } from "@/lib/types";
-import { InsigniaEstado, Modal, Puntaje, Vacio } from "@/components/ui";
+import { EsqueletoLista, InsigniaEstado, Modal, Puntaje, Vacio } from "@/components/ui";
 import NuevaVacante from "@/components/NuevaVacante";
 
 function Contenido() {
@@ -95,9 +95,13 @@ function Contenido() {
           }
         />
       ) : vista === "lista" ? (
-        <ul className="space-y-2.5">
-          {visibles.map((v) => (
-            <li key={v.id} className="panel p-4">
+        <ul className="aparece-escalonado space-y-2.5">
+          {visibles.map((v, i) => (
+            <li
+              key={v.id}
+              className="panel panel-interactivo p-4"
+              style={{ "--i": i } as React.CSSProperties}
+            >
               <div className="flex flex-wrap items-start gap-3">
                 {v.analisis ? (
                   <Puntaje valor={v.analisis.puntaje} />
@@ -222,7 +226,7 @@ function Contenido() {
 
 export default function Vacantes() {
   return (
-    <Suspense fallback={<p className="text-sm text-[var(--color-suave)]">Cargando…</p>}>
+    <Suspense fallback={<EsqueletoLista />}>
       <Contenido />
     </Suspense>
   );

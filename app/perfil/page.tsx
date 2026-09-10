@@ -7,14 +7,14 @@ import ImportarPerfil from "@/components/ImportarPerfil";
 import { nuevoId } from "@/lib/store";
 import { PERFIL_INICIAL } from "@/lib/seed";
 import type { Experiencia, Logro, PerfilMaestro } from "@/lib/types";
-import { Alerta } from "@/components/ui";
+import { Alerta, EsqueletoPaneles } from "@/components/ui";
 
 export default function Perfil() {
   const { estado, listo, guardarPerfil } = useApp();
   const p = estado.perfil;
   const [abierta, setAbierta] = useState<string | null>(p.experiencias[0]?.id ?? null);
 
-  if (!listo) return <p className="text-sm text-[var(--color-suave)]">Cargando…</p>;
+  if (!listo) return <EsqueletoPaneles />;
 
   const set = (parcial: Partial<PerfilMaestro>) => guardarPerfil({ ...p, ...parcial });
 
