@@ -146,3 +146,22 @@ npm run dev
 
 En [localhost:3000](http://localhost:3000). Funciona todo salvo Careerjet, que
 necesita un dominio registrado y en local no lo hay.
+
+---
+
+## Mantener la plantilla al día
+
+Si tienes una copia privada con tus propios datos y quieres traer aquí sus
+cambios sin publicar nada personal:
+
+```bash
+node scripts-sincronizar.mjs ../ruta-a-tu-repo-privado
+```
+
+Copia los ficheros del último commit de allí, aplica las sustituciones que
+despersonalizan el código, y **aborta si encuentra un dato personal para el que
+no hay regla**. Los ficheros propios de la plantilla —el perfil semilla, esta
+documentación, la licencia— nunca se sobrescriben.
+
+Copiar a mano ya metió dos veces un nombre real en el repositorio público. El
+script no se despista.

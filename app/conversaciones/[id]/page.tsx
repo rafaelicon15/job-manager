@@ -20,6 +20,7 @@ import { parsearVacante, redactarEnHilo, type RespuestaHilo } from "@/lib/gemini
 import { CANALES, type Idioma } from "@/lib/types";
 import { nuevoId } from "@/lib/store";
 import { Alerta, BotonCopiar, Cargando, EsqueletoDetalle, Modal, Vacio } from "@/components/ui";
+import Adjuntos from "@/components/Adjuntos";
 
 const TONOS = [
   "Profesional y directo",
@@ -371,6 +372,14 @@ export default function Hilo({ params }: { params: Promise<{ id: string }> }) {
           )}
         </div>
       )}
+
+      <Adjuntos
+        adjuntos={conv.adjuntos}
+        onCambio={(adjuntos) => actualizarConversacion(conv.id, { adjuntos })}
+        contexto={`Conversación por ${conv.canal} con ${conv.contacto.nombre}${
+          conv.contacto.empresa ? ` de ${conv.contacto.empresa}` : ""
+        }${vacante ? `, sobre la vacante de ${vacante.titulo}` : ""}.`}
+      />
 
       <section className="panel p-5">
         <div className="mb-4 flex items-center justify-between">

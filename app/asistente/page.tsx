@@ -63,6 +63,7 @@ function vacanteGenerica(perfil: string): Vacante {
     actualizadaEn: new Date().toISOString(),
     documentos: [],
     notas: [],
+    adjuntos: [],
   };
 }
 

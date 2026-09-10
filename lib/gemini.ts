@@ -3,6 +3,7 @@
 import { Type } from "@google/genai";
 import type {
   Analisis,
+  AnalisisDocumento,
   Conversacion,
   Idioma,
   Incoherencia,
@@ -19,6 +20,7 @@ import {
   promptHilo,
   promptCarta,
   promptEntrevista,
+  promptDocumento,
 } from "./prompts";
 
 /**
@@ -182,23 +184,31 @@ async function llamarProxy(
   apiKey: string,
   modelo: string,
   prompt: string,
-  schema: object
+  schema: object,
+  archivos?: ArchivoInline[]
 ): Promise<string> {
   const r = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, modelo, prompt, schema }),
+    body: JSON.stringify({ apiKey, modelo, prompt, schema, archivos }),
   });
   const d = await r.json().catch(() => null);
   if (!r.ok || d?.error) throw new Error(d?.error ?? `HTTP ${r.status}`);
   return d.texto as string;
 }
 
+/** Archivo que Gemini lee nativamente, tal como lo espera el proxy. */
+export interface ArchivoInline {
+  mimeType: string;
+  datos: string;
+}
+
 async function generarJSON<T>(
   apiKey: string,
   modelo: string,
   prompt: string,
-  schema: object
+  schema: object,
+  archivos?: ArchivoInline[]
 ): Promise<T> {
   verificarClave(apiKey);
   // Si el modelo elegido se satura, se reintenta con el de respaldo antes de
@@ -209,7 +219,7 @@ async function generarJSON<T>(
   for (const actual of cola) {
     for (let intento = 0; intento <= REINTENTOS; intento++) {
       try {
-        const texto = await llamarProxy(apiKey, actual, prompt, schema);
+        const texto = await llamarProxy(apiKey, actual, prompt, schema, archivos);
         if (actual !== modelo)
           emitir({ tipo: "respaldo", modeloOriginal: modelo, modeloUsado: actual });
         const dato = JSON.parse(texto) as T;
@@ -850,4 +860,92 @@ export async function probarClave(
       mensaje: e instanceof Error ? e.message : "No se pudo contactar con el servidor.",
     };
   }
+}
+
+const esquemaDocumento = {
+  type: Type.OBJECT,
+  properties: {
+    clase: {
+      type: Type.STRING,
+      enum: [
+        "descripcion_puesto",
+        "contrato",
+        "propuesta_economica",
+        "prueba_tecnica",
+        "confidencialidad",
+        "otro",
+      ],
+    },
+    titulo: { type: Type.STRING },
+    resumen: { type: Type.STRING },
+    puntosClave: { type: Type.ARRAY, items: { type: Type.STRING } },
+    cifras: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          concepto: { type: Type.STRING },
+          valor: { type: Type.STRING },
+        },
+        required: ["concepto", "valor"],
+      },
+    },
+    alertas: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          asunto: { type: Type.STRING },
+          porque: { type: Type.STRING },
+          queHacer: { type: Type.STRING },
+        },
+        required: ["asunto", "porque", "queHacer"],
+      },
+    },
+    encaje: { type: Type.STRING },
+    huecos: { type: Type.ARRAY, items: { type: Type.STRING } },
+    preguntasQueHacer: { type: Type.ARRAY, items: { type: Type.STRING } },
+  },
+  required: [
+    "clase",
+    "titulo",
+    "resumen",
+    "puntosClave",
+    "cifras",
+    "alertas",
+    "encaje",
+    "huecos",
+    "preguntasQueHacer",
+  ],
+};
+
+/**
+ * Analiza un documento que manda el reclutador. Los PDFs e imágenes viajan
+ * como `inlineData` y los lee Gemini directamente, así que un contrato
+ * escaneado también funciona. El .docx y el texto plano llegan ya extraídos
+ * desde el navegador.
+ */
+export async function analizarDocumento(
+  apiKey: string,
+  modelo: string,
+  perfil: PerfilMaestro,
+  nombreArchivo: string,
+  contexto: string,
+  fuente: { via: "inline"; mimeType: string; datos: string } | { via: "texto"; texto: string }
+): Promise<AnalisisDocumento> {
+  const bruto = await generarJSON<Omit<AnalisisDocumento, "generadoEn" | "modelo">>(
+    apiKey,
+    modelo,
+    promptDocumento(
+      perfil,
+      nombreArchivo,
+      contexto,
+      fuente.via === "texto" ? fuente.texto : undefined
+    ),
+    esquemaDocumento,
+    fuente.via === "inline"
+      ? [{ mimeType: fuente.mimeType, datos: fuente.datos }]
+      : undefined
+  );
+  return { ...bruto, generadoEn: new Date().toISOString(), modelo };
 }

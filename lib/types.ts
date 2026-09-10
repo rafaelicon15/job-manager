@@ -157,6 +157,8 @@ export interface Vacante {
   contacto?: { nombre?: string; cargo?: string; linkedin?: string; email?: string };
   analisis?: Analisis;
   documentos: DocumentoGenerado[];
+  /** Material que manda el reclutador, ya analizado. */
+  adjuntos: Adjunto[];
   notas: { id: string; texto: string; fecha: string }[];
 }
 
@@ -218,8 +220,54 @@ export interface Conversacion {
   /** Preguntas que hiciste y que todavía no te han respondido. */
   preguntasSinResponder: string[];
   incoherencias: Incoherencia[];
+  /** Material que manda el reclutador en el hilo, ya analizado. */
+  adjuntos: Adjunto[];
   creadaEn: string;
   actualizadaEn: string;
+}
+
+/**
+ * Un documento que manda el reclutador: la descripción del puesto en PDF, un
+ * contrato, una propuesta económica, una prueba técnica.
+ *
+ * No guarda los bytes del archivo, solo su ficha y el análisis. El estado vive
+ * en localStorage (unos 5 MB) y tres PDFs lo llenarían, tirando por delante
+ * vacantes y conversaciones. El original sigue en el disco del usuario.
+ */
+export interface Adjunto {
+  id: string;
+  nombre: string;
+  bytes: number;
+  /** mimeType si lo trae el navegador, o la extensión. */
+  tipo: string;
+  subidoEn: string;
+  analisis?: AnalisisDocumento;
+}
+
+export type ClaseDocumento =
+  | "descripcion_puesto"
+  | "contrato"
+  | "propuesta_economica"
+  | "prueba_tecnica"
+  | "confidencialidad"
+  | "otro";
+
+export interface AnalisisDocumento {
+  clase: ClaseDocumento;
+  titulo: string;
+  resumen: string;
+  puntosClave: string[];
+  /** Cifras concretas que aparecen: sueldo, plazos, penalizaciones, horas. */
+  cifras: { concepto: string; valor: string }[];
+  /** Cláusulas o condiciones que conviene mirar dos veces antes de firmar. */
+  alertas: { asunto: string; porque: string; queHacer: string }[];
+  /** Cómo cuadra con el perfil maestro. Vacío si el documento no lo permite. */
+  encaje: string;
+  /** Lo que el documento NO dice y debería. Suele ser lo más caro. */
+  huecos: string[];
+  preguntasQueHacer: string[];
+  generadoEn: string;
+  modelo: string;
 }
 
 export interface Ajustes {

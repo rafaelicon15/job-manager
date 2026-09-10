@@ -417,3 +417,43 @@ Prepara la entrevista en ${lang}. Devuelve el JSON pedido:
 
 Nunca le pongas en la boca una experiencia, herramienta, cifra o titulación que el perfil no respalde. Si un requisito no lo cumple, la respuesta debe reconocerlo y reencuadrarlo, no esquivarlo.`;
 }
+
+/**
+ * Analiza un documento que manda el reclutador. Cubre dos casos muy distintos
+ * con el mismo prompt porque el modelo clasifica primero: una descripción de
+ * puesto (¿me encaja?) y un contrato o propuesta (¿qué estoy firmando?).
+ *
+ * El acento está en lo que un candidato con prisa no lee: las cláusulas que
+ * atan, y sobre todo lo que el documento NO dice. Un contrato sin fecha de
+ * pago o sin causa de terminación no es un contrato incompleto, es un riesgo.
+ */
+export function promptDocumento(
+  p: PerfilMaestro,
+  nombreArchivo: string,
+  contexto: string,
+  textoExtraido?: string
+): string {
+  return `Eres un asesor de carrera con criterio jurídico básico, revisando un documento que le acaba de llegar a ${p.nombre} de parte de una empresa. Tu trabajo es que entienda qué tiene delante y qué le puede costar caro.
+
+${perfilComoTexto(p)}
+
+${reglasDeHonestidad(p)}
+
+DOCUMENTO: "${nombreArchivo}"
+${contexto ? `CONTEXTO: ${contexto}` : ""}
+${textoExtraido ? `\nCONTENIDO:\n"""\n${textoExtraido.slice(0, 60000)}\n"""` : "\nEl documento va adjunto: léelo."}
+
+Devuelve JSON con estas claves:
+
+- clase: una de "descripcion_puesto", "contrato", "propuesta_economica", "prueba_tecnica", "confidencialidad", "otro".
+- titulo: cómo llamarías a este documento en cuatro palabras.
+- resumen: 2 o 3 frases. Qué es y qué le pide o le ofrece.
+- puntosClave: lo que de verdad importa, en frases cortas. Entre 3 y 8.
+- cifras: toda cifra concreta que aparezca, con su concepto. Sueldos, plazos de pago, días de vacaciones, horas semanales, penalizaciones, duración, porcentajes. Si no hay ninguna, lista vacía. NO inventes cifras ni las redondees: cópialas como están.
+- alertas: cláusulas o condiciones que conviene mirar dos veces ANTES de firmar o aceptar. Para cada una: "asunto" (la cláusula), "porque" (qué riesgo real tiene para él, en concreto, no en abstracto) y "queHacer" (qué negociar o preguntar). Mira especialmente: exclusividad, no competencia y su duración, propiedad intelectual que se lleve trabajos anteriores, penalizaciones desproporcionadas, plazos de pago largos o sin fecha, renovación automática, jurisdicción en otro país, pruebas técnicas no remuneradas de más de 4 horas, y cualquier cosa que fije obligaciones para él sin fijar ninguna para la empresa. Si el documento está limpio, lista vacía: NO inventes alarmas para rellenar.
+- encaje: si es una descripción de puesto o una prueba técnica, cómo cuadra con su perfil real y qué le falta. Si es un contrato o una propuesta, si las condiciones encajan con lo que él busca (${p.preferencias.salarioObjetivo || "expectativa salarial sin definir"}, ${p.preferencias.modalidad || "modalidad sin definir"}). Cadena vacía si el documento no da para opinar.
+- huecos: lo que el documento NO dice y debería. Esto suele ser más caro que lo que sí dice. Por ejemplo: no fija fecha de pago, no dice quién paga las herramientas, no define qué pasa si el cliente cancela, no aclara si las horas son fijas. Lista vacía si está todo cubierto.
+- preguntasQueHacer: preguntas concretas que debería mandar por escrito antes de comprometerse. Redactadas tal cual para copiar y pegar. Entre 2 y 6.
+
+No des consejo legal definitivo ni digas si debe firmar. Señala qué mirar y qué preguntar. Si algo del documento es ambiguo, dilo como ambiguo en lugar de elegir la interpretación que suene mejor.`;
+}

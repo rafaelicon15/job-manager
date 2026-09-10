@@ -11,6 +11,7 @@ import {
   Mic,
   MessagesSquare,
   NotebookPen,
+  Paperclip,
   Star,
   Target,
   Trash2,
@@ -23,6 +24,7 @@ import PanelCV from "@/components/PanelCV";
 import PanelCarta from "@/components/PanelCarta";
 import PanelRespuestas from "@/components/PanelRespuestas";
 import PanelEntrevista from "@/components/PanelEntrevista";
+import Adjuntos from "@/components/Adjuntos";
 import { nuevoId } from "@/lib/store";
 
 type Pestana =
@@ -31,6 +33,7 @@ type Pestana =
   | "carta"
   | "respuestas"
   | "entrevista"
+  | "material"
   | "oferta"
   | "notas";
 
@@ -40,6 +43,7 @@ const PESTANAS: { id: Pestana; label: string; Icono: typeof Target }[] = [
   { id: "carta", label: "Carta y mensaje", Icono: Mail },
   { id: "respuestas", label: "Respuestas", Icono: MessagesSquare },
   { id: "entrevista", label: "Entrevista", Icono: Mic },
+  { id: "material", label: "Material", Icono: Paperclip },
   { id: "oferta", label: "La oferta", Icono: ExternalLink },
   { id: "notas", label: "Notas", Icono: NotebookPen },
 ];
@@ -244,6 +248,14 @@ export default function FichaVacante({
       {pestana === "carta" && <PanelCarta vacante={vacante} />}
       {pestana === "respuestas" && <PanelRespuestas vacante={vacante} />}
       {pestana === "entrevista" && <PanelEntrevista vacante={vacante} />}
+
+      {pestana === "material" && (
+        <Adjuntos
+          adjuntos={vacante.adjuntos}
+          onCambio={(adjuntos) => actualizarVacante(vacante.id, { adjuntos })}
+          contexto={`Vacante de ${vacante.titulo} en ${vacante.empresa || "empresa sin nombre"}.`}
+        />
+      )}
 
       {pestana === "oferta" && (
         <div className="panel p-5">

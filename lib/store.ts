@@ -23,8 +23,23 @@ function hidratar(crudo: string | null): EstadoApp {
     return {
       version: ESTADO_INICIAL.version,
       perfil: { ...ESTADO_INICIAL.perfil, ...(guardado.perfil ?? {}) },
-      vacantes: guardado.vacantes ?? [],
-      conversaciones: guardado.conversaciones ?? [],
+      // Los campos nuevos se rellenan al leer: un estado guardado antes de
+      // que existieran los adjuntos traeria `undefined` y el primer .map()
+      // sobre el reventaria la app al abrirla.
+      vacantes: (guardado.vacantes ?? []).map((v) => ({
+        ...v,
+        documentos: v.documentos ?? [],
+        notas: v.notas ?? [],
+        adjuntos: v.adjuntos ?? [],
+      })),
+      conversaciones: (guardado.conversaciones ?? []).map((c) => ({
+        ...c,
+        mensajes: c.mensajes ?? [],
+        pendientes: c.pendientes ?? [],
+        preguntasSinResponder: c.preguntasSinResponder ?? [],
+        incoherencias: c.incoherencias ?? [],
+        adjuntos: c.adjuntos ?? [],
+      })),
       ajustes: { ...ESTADO_INICIAL.ajustes, ...(guardado.ajustes ?? {}) },
     };
   } catch {
@@ -76,7 +91,7 @@ export function useEstado() {
   }, []);
 
   const agregarVacante = useCallback(
-    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "favorito" | "estado"> &
+    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "adjuntos" | "favorito" | "estado"> &
       Partial<Pick<Vacante, "estado" | "favorito">>) => {
       const ahora = new Date().toISOString();
       const vacante: Vacante = {
@@ -87,6 +102,7 @@ export function useEstado() {
         actualizadaEn: ahora,
         documentos: [],
         notas: [],
+        adjuntos: [],
         ...v,
       } as Vacante;
       setEstado((s) => ({ ...s, vacantes: [vacante, ...s.vacantes] }));
@@ -187,6 +203,7 @@ export function useEstado() {
         pendientes: [],
         preguntasSinResponder: [],
         incoherencias: [],
+        adjuntos: [],
         creadaEn: ahora,
         actualizadaEn: ahora,
         ...c,

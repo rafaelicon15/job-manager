@@ -20,13 +20,32 @@ export const dynamic = "force-dynamic";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+/** Un archivo que Gemini lee nativamente (PDF o imagen). */
+interface ArchivoInline {
+  mimeType: string;
+  /** base64 sin cabecera data:. */
+  datos: string;
+}
+
 interface Cuerpo {
   apiKey?: string;
   modelo?: string;
   prompt?: string;
   schema?: object;
   temperature?: number;
+  archivos?: ArchivoInline[];
 }
+
+/** Lo que Gemini acepta como inlineData. El .docx no esta: se convierte a
+ *  texto en el navegador antes de llegar aqui. */
+const MIME_PERMITIDOS = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
 
 export async function POST(req: Request) {
   let c: Cuerpo;
@@ -45,8 +64,18 @@ export async function POST(req: Request) {
   if (!/^[a-zA-Z0-9.\-_]+$/.test(modelo))
     return NextResponse.json({ error: "Nombre de modelo inválido" }, { status: 400 });
 
+  // Se filtra por tipo antes de reenviar: esta ruta no debe convertirse en un
+  // pasarela para subir cualquier cosa a Google con la clave del usuario.
+  const archivos = (c.archivos ?? []).filter((a) => a && MIME_PERMITIDOS.has(a.mimeType));
+  if ((c.archivos?.length ?? 0) !== archivos.length)
+    return NextResponse.json(
+      { error: "Algun archivo tiene un tipo que Gemini no acepta." },
+      { status: 400 }
+    );
+
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 120000);
+  // Un PDF de varias paginas tarda mas que un prompt de texto.
+  const t = setTimeout(() => ctrl.abort(), archivos.length ? 180000 : 120000);
   try {
     const r = await fetch(
       `${BASE}/${encodeURIComponent(modelo)}:generateContent`,
@@ -58,7 +87,18 @@ export async function POST(req: Request) {
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: c.prompt }] }],
+          contents: [
+            {
+              parts: [
+                // Los archivos van primero: Gemini rinde mejor cuando la
+                // instruccion llega despues del material que tiene que leer.
+                ...archivos.map((a) => ({
+                  inlineData: { mimeType: a.mimeType, data: a.datos },
+                })),
+                { text: c.prompt },
+              ],
+            },
+          ],
           generationConfig: {
             responseMimeType: "application/json",
             ...(c.schema ? { responseSchema: c.schema } : {}),
