@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Job Manager — Capturar vacante",
-  "version": "1.0.0",
-  "description": "Envía la oferta de empleo que estás viendo a tu Job Manager con un clic. Sin bots, sin iniciar sesión por ti.",
+  "version": "1.1.0",
+  "description": "Captura la oferta que estás viendo y rellena su formulario con tus datos. No envía nada por ti, no inicia sesión y no marca casillas.",
   "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Capturar esta vacante"
+    "default_title": "Capturar la vacante o rellenar el formulario"
   },
   "icons": {
     "128": "icono128.png"

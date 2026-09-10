@@ -127,3 +127,112 @@ document.getElementById("capturar").addEventListener("click", async () => {
     decir(`No se pudo leer la pestaña: ${e.message}`, "err");
   }
 });
+
+// ---------------------------------------------------------- autorrelleno
+
+/**
+ * Se inyecta en la pestaña de la app para sacar una ficha compacta del perfil.
+ * Corre en el origen de la app, que es el único que puede leer su
+ * localStorage. No se guarda el perfil entero: solo lo que hace falta para
+ * rellenar un formulario, y nada de eso sale del navegador.
+ */
+function leerFicha() {
+  let estado;
+  try {
+    estado = JSON.parse(localStorage.getItem("rjm:estado:v1") || "null");
+  } catch {
+    return { error: "No pude leer los datos guardados." };
+  }
+  const p = estado?.perfil;
+  if (!p?.nombre) return { error: "No hay perfil cargado en esta app." };
+
+  const partes = p.nombre.trim().split(/\s+/);
+  const enlace = (patron) =>
+    (p.links || []).find((l) => patron.test(l.etiqueta || "") || patron.test(l.url || ""))?.url || "";
+  const [ciudad, ...resto] = (p.ubicacion || "").split(",").map((x) => x.trim());
+
+  return {
+    ficha: {
+      nombre: p.nombre,
+      nombrePila: partes.slice(0, partes.length > 2 ? 2 : 1).join(" "),
+      apellidos: partes.length > 2 ? partes.slice(2).join(" ") : partes.slice(1).join(" "),
+      email: p.email || "",
+      telefono: p.telefono || "",
+      ciudad: ciudad || "",
+      pais: resto.join(", ") || "",
+      titular: p.titular || "",
+      resumen: p.resumen || "",
+      linkedin: enlace(/linkedin/i),
+      web: enlace(/portafolio|portfolio|sitio|web/i),
+      salario: p.preferencias?.salarioObjetivo || "",
+      disponibilidad: p.preferencias?.disponibilidad || "",
+    },
+  };
+}
+
+document.getElementById("sincronizar").addEventListener("click", async () => {
+  decir("Leyendo tu perfil…");
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const base = $app.value.trim().replace(/\/+$/, "");
+    // Se exige estar EN la pestaña de la app: así el permiso es activeTab y la
+    // extensión no necesita acceso permanente a ningún sitio.
+    if (!tab?.url || (base && !tab.url.startsWith(base))) {
+      decir(
+        "Abre tu Job Manager en esta pestaña y vuelve a pulsar. Los datos solo se leen desde ahí.",
+        "err"
+      );
+      return;
+    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: leerFicha,
+    });
+    if (result?.error) {
+      decir(result.error, "err");
+      return;
+    }
+    await chrome.storage.local.set({ ficha: result.ficha, fichaFecha: Date.now() });
+    decir(`Datos guardados (${result.ficha.nombre}). Ya puedes rellenar formularios.`, "ok");
+  } catch (e) {
+    decir(`No se pudo leer: ${e.message}`, "err");
+  }
+});
+
+document.getElementById("rellenar").addEventListener("click", async () => {
+  const { ficha, fichaFecha } = await chrome.storage.local.get(["ficha", "fichaFecha"]);
+  if (!ficha) {
+    decir(
+      'Primero abre tu Job Manager y pulsa "Sincronizar mis datos". Se hace una vez.',
+      "err"
+    );
+    return;
+  }
+  decir("Rellenando…");
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || /^(chrome|edge|about|chrome-extension):/.test(tab.url || "")) {
+      decir("Abre el formulario de postulación en una pestaña normal.", "err");
+      return;
+    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: rellenarFormulario,
+      args: [ficha],
+    });
+    if (!result || !result.total) {
+      decir("No encontré ningún campo de formulario en esta página.", "err");
+      return;
+    }
+    const dias = Math.floor((Date.now() - (fichaFecha || 0)) / 864e5);
+    const aviso =
+      dias > 30 ? ` Tus datos se sincronizaron hace ${dias} días: si cambiaste el perfil, vuelve a sincronizar.` : "";
+    decir(
+      `${result.escritos} campos rellenos, ${result.pendientes} en ámbar para que los contestes tú. ` +
+        `Revisa TODO antes de enviar: el envío es tuyo.${aviso}`,
+      result.escritos ? "ok" : "info"
+    );
+  } catch (e) {
+    decir(`No se pudo rellenar: ${e.message}`, "err");
+  }
+});

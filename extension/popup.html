@@ -82,20 +82,34 @@
       .info {
         color: #93a3bd;
       }
+      .pie {
+        margin: 10px 0 0;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #6b7a94;
+      }
     </style>
   </head>
   <body>
     <h1>Job Manager</h1>
-    <p class="sub">Captura la oferta que tienes abierta y ábrela en tu panel.</p>
+    <p class="sub">Captura la oferta que tienes abierta, o rellena su formulario con tus datos.</p>
 
     <label for="app">URL de tu Job Manager</label>
     <input id="app" type="url" placeholder="https://tu-app.vercel.app" />
 
     <button id="capturar">Capturar esta vacante</button>
+    <button id="rellenar" class="sec">Rellenar este formulario</button>
+    <button id="sincronizar" class="sec">Sincronizar mis datos</button>
     <button id="guardar" class="sec">Guardar URL</button>
+
+    <p class="pie">
+      El autorrelleno nunca envía el formulario, ni marca casillas, ni toca
+      contraseñas. Revisa y envía tú.
+    </p>
 
     <div id="estado"></div>
 
+    <script src="rellenar.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

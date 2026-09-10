@@ -126,14 +126,36 @@ Publisher. Sin registrarla, esa fuente no funcionará en tu despliegue.
 
 ### 4. Instala la extensión de Chrome (opcional)
 
-Lee la vacante que tengas abierta en cualquier portal y la manda a tu app.
-
 1. `chrome://extensions` → activa **Modo de desarrollador**.
 2. **Cargar descomprimida** → selecciona la carpeta `extension/` del proyecto.
 3. Abre la extensión y pon la URL de tu despliegue.
 
-No pide contraseñas ni entra en tu cuenta de ningún portal: solo lee el texto de
-la pestaña que tú tengas abierta.
+Hace dos cosas:
+
+**Capturar esta vacante.** Lee el texto de la oferta que tengas abierta y la
+manda a tu app.
+
+**Rellenar este formulario.** Rellena el formulario de postulación con tus datos
+del perfil. La primera vez, abre tu app en una pestaña y pulsa **Sincronizar mis
+datos**: lee tu perfil desde ahí, lo que obliga a estar en la app y evita que la
+extensión necesite permiso permanente sobre ningún sitio. Luego, en cualquier
+portal, pulsa **Rellenar este formulario**.
+
+Lo rellenado sale en **verde**; lo que queda pendiente, en **ámbar**.
+
+Lo que no hace, por diseño:
+
+- **No envía nunca el formulario.** El botón de postular lo pulsas tú.
+- **No marca casillas.** Aceptar unas condiciones lo decides tú.
+- **No toca** contraseñas, documentos de identidad, tarjetas ni la subida de
+  archivos: el CV que se adjunta lo eliges tú.
+- **No sobrescribe** lo que ya hayas escrito.
+- **No inventa.** Si el portal pregunta "¿cuántos años con [herramienta]?" y eso
+  no está en tu perfil, lo deja en ámbar. Esa la contestas tú, porque queda por
+  escrito y la va a leer un reclutador.
+
+No pide contraseñas ni entra en tu cuenta de ningún portal: trabaja sobre la
+pestaña que tú tengas abierta, con tu sesión.
 
 ---
 
