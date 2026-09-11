@@ -98,6 +98,38 @@ export function mismoPendiente(a: string, b: string): boolean {
 }
 
 /**
+ * Colapsa una lista que YA tiene duplicados. Hace falta además de
+ * `juntarPendientes` porque arreglar la fusión no limpia lo que se guardó
+ * antes: quien ya tenía nueve entradas para dos tareas seguiría viéndolas.
+ * Se aplica al leer el estado, así que la lista se arregla sola.
+ *
+ * De cada grupo de duplicados sobrevive el texto más corto, que es el más
+ * legible, y queda marcado como hecho si CUALQUIERA del grupo lo estaba: si ya
+ * mandaste el CV, la tarea está hecha aunque el motor la haya reescrito luego
+ * de cuatro maneras distintas.
+ */
+export function limpiarPendientes<T extends { que: string; hecho: boolean }>(
+  lista: T[]
+): T[] {
+  const salida: T[] = [];
+
+  for (const p of lista) {
+    const i = salida.findIndex((q) => mismoPendiente(q.que, p.que));
+    if (i === -1) {
+      salida.push(p);
+      continue;
+    }
+    salida[i] = {
+      ...salida[i],
+      que: p.que.length < salida[i].que.length ? p.que : salida[i].que,
+      hecho: salida[i].hecho || p.hecho,
+    };
+  }
+
+  return salida;
+}
+
+/**
  * Une los pendientes que ya existen con los recién detectados, sin repetir.
  * Se conserva el que ya estaba —puede estar marcado como hecho— y si el nuevo
  * explica mejor la tarea y nadie la ha tocado, se queda la redacción más corta

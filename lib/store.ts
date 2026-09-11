@@ -11,6 +11,7 @@ import type {
   PerfilMaestro,
   Vacante,
 } from "./types";
+import { limpiarPendientes } from "./pendientes";
 import { ESTADO_INICIAL } from "./seed";
 
 const CLAVE = "rjm:estado:v1";
@@ -35,7 +36,10 @@ function hidratar(crudo: string | null): EstadoApp {
       conversaciones: (guardado.conversaciones ?? []).map((c) => ({
         ...c,
         mensajes: c.mensajes ?? [],
-        pendientes: c.pendientes ?? [],
+        // Se colapsan al leer, no solo al generar: arreglar la fusión no
+        // limpia lo que se guardó antes, y quien ya tenía nueve entradas para
+        // dos tareas seguiría viéndolas para siempre.
+        pendientes: limpiarPendientes(c.pendientes ?? []),
         preguntasSinResponder: c.preguntasSinResponder ?? [],
         incoherencias: c.incoherencias ?? [],
         adjuntos: c.adjuntos ?? [],
