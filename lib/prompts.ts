@@ -1,4 +1,10 @@
-import type { Analisis, Idioma, PerfilMaestro, Vacante } from "./types";
+import type {
+  Adjunto,
+  Analisis,
+  Idioma,
+  PerfilMaestro,
+  Vacante,
+} from "./types";
 
 /**
  * Serializa el perfil maestro a un bloque compacto que el modelo pueda citar.
@@ -107,12 +113,41 @@ ${textoCrudo.slice(0, 60000)}
 """`;
 }
 
+/**
+ * Cómo debe SONAR todo lo que escribe el motor. Separado de las reglas de
+ * honestidad porque son cosas distintas: aquellas evitan que mienta, estas
+ * evitan que suene a texto generado por una máquina.
+ *
+ * Los guiones largos son el caso más delatador. Un modelo los usa para meter
+ * aclaraciones a mitad de frase y el resultado se reconoce a distancia; una
+ * persona escribiendo por chat pone una coma o parte la frase en dos.
+ */
+export function reglasDeEstilo(): string {
+  return `
+CÓMO ESCRIBIR
+  - NO uses guiones largos (—) ni guiones para meter aclaraciones dentro de una
+    frase. Usa comas, paréntesis, o parte la frase en dos. Esto aplica también a
+    los guiones cortos usados como separadores de ideas.
+  - Nada de superlativos vacíos: "encaja perfectamente", "soy el candidato
+    ideal", "me apasiona", "experiencia extensa". Di lo que encaja y por qué.
+    "Se alinea con" en lugar de "encaja perfectamente".
+  - Nada de relleno de cortesía: "quedo atento a tus comentarios", "no dudes en
+    contactarme", "agradezco de antemano". Si hay que cerrar, un "quedo atento"
+    basta.
+  - Frases cortas. Si una frase pasa de 25 palabras, pártela.
+  - No enumeres tres herramientas cuando una demuestra lo mismo.
+  - Escribe como habla alguien que sabe de lo que habla: concreto y sin adornos.
+`.trim();
+}
+
 export function promptAnalizar(p: PerfilMaestro, v: Vacante): string {
   return `Eres un reclutador técnico veterano y a la vez el agente de carrera de ${p.nombre}. Tu trabajo es decirle la verdad, no darle ánimos.
 
 ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
 
 VACANTE A EVALUAR
   Puesto: ${v.titulo}
@@ -154,6 +189,8 @@ ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
 
+${reglasDeEstilo()}
+
 VACANTE OBJETIVO
   Puesto: ${v.titulo} — ${v.empresa}
   Descripción:
@@ -192,6 +229,8 @@ export function promptRespuesta(
 ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
 
 CONTEXTO DE LA VACANTE
   Puesto: ${v.titulo} — ${v.empresa}
@@ -261,6 +300,18 @@ ${textoCrudo.slice(0, 60000)}
 """`;
 }
 
+/**
+ * Redacta la respuesta a un hilo con un reclutador.
+ *
+ * Las reglas de este prompt salen de correcciones reales sobre respuestas que
+ * el motor dio mal, no de suposiciones:
+ *  - Saludaba en cada mensaje, incluso con la conversación ya abierta.
+ *  - Escribía como un correo formal en un chat de LinkedIn.
+ *  - Ofrecía la expectativa salarial por su cuenta, antes de que conviniera.
+ *  - Ignoraba el documento adjunto a la ficha, así que había que pegarle a mano
+ *    lo que decía.
+ *  - Se iba a 500 caracteres cuando 300 concretos funcionaban mejor.
+ */
 export function promptHilo(
   p: PerfilMaestro,
   canal: string,
@@ -269,18 +320,60 @@ export function promptHilo(
   vacante: Vacante | undefined,
   instrucciones: string,
   idioma: Idioma,
-  tono: string
+  tono: string,
+  adjuntos: Adjunto[] = []
 ): string {
   const lang = idioma === "en" ? "inglés" : "español";
+
+  // Si ya ha escrito antes en el hilo, la conversación está abierta y volver a
+  // saludar suena a plantilla.
+  const conversacionAbierta = hilo.some((m) => m.de === "yo");
+  const nombreContacto = contacto.split(/[\s,·|]/)[0] || "el reclutador";
+
   const limites: Record<string, string> = {
     linkedin:
-      "LinkedIn: sin asunto, saludo corto por el nombre de pila, párrafos breves. Lo ideal son 80-160 palabras; nadie lee un muro de texto en un chat.",
+      'LinkedIn es un CHAT, no un correo. Entre 40 y 80 palabras, nunca más de 600 caracteres. Sin asunto, sin "Estimada", sin despedida de carta, sin firma con tu nombre completo. Un párrafo, o dos cortos como mucho.',
     email:
-      "Correo: incluye una línea de asunto en el campo 'asunto'. Estructura de email formal pero directa, con despedida y firma.",
+      'Correo. Rellena el campo "asunto". Saludo, dos o tres párrafos cortos y una despedida breve con tu nombre. Entre 90 y 160 palabras.',
     whatsapp:
-      "WhatsApp: muy breve y conversacional, 40-90 palabras. Frases cortas, sin lenguaje corporativo, sin firma. Se puede partir en 2 mensajes si conviene.",
-    otro: "Formato neutro, breve y profesional.",
+      "WhatsApp. Muy breve, entre 25 y 60 palabras. Frases cortas, tono directo, nada corporativo, sin firma.",
+    otro: "Formato neutro, breve y profesional. Menos de 120 palabras.",
   };
+
+  const material = adjuntos.filter((a) => a.analisis);
+
+  const bloqueMaterial = material.length
+    ? `MATERIAL QUE YA TE HAN MANDADO Y QUE YA HAS LEÍDO
+Esto sale de documentos adjuntos a esta ficha. NO preguntes por nada que ya esté
+aquí: preguntarlo demuestra que no lo abriste. Al contrario, cita un detalle
+concreto de aquí para que se vea que sí lo leíste.
+${material
+  .map((a) => {
+    const an = a.analisis!;
+    return [
+      `  [${a.nombre}] ${an.titulo}`,
+      `  Resumen: ${an.resumen}`,
+      `  Puntos clave: ${an.puntosClave.join(" | ")}`,
+      an.cifras.length
+        ? `  Cifras: ${an.cifras.map((c) => `${c.concepto}: ${c.valor}`).join(" | ")}`
+        : "",
+      an.encaje ? `  Encaje con el perfil: ${an.encaje}` : "",
+      an.huecos.length
+        ? `  LO QUE EL DOCUMENTO NO DICE, de aquí salen las preguntas buenas: ${an.huecos.join(" | ")}`
+        : "",
+      an.alertas.length
+        ? `  Alertas: ${an.alertas.map((x) => x.asunto).join(" | ")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  })
+  .join("\n\n")}`
+    : "No hay documentos adjuntos a esta ficha.";
+
+  const reglaSaludo = conversacionAbierta
+    ? `LA CONVERSACIÓN YA ESTÁ ABIERTA: ya has escrito antes en este hilo. NO vuelvas a saludar. Nada de "Hola ${nombreContacto}", nada de presentarte, nada de "gracias por contactarme". Entra directo a lo que toca. Como mucho, una fórmula de una palabra si agradeces algo que te acaban de mandar.`
+    : "Es tu primer mensaje en este hilo: un saludo corto por el nombre de pila y al asunto.";
 
   return `Escribes EN PRIMERA PERSONA COMO SI FUERAS ${p.nombre}. Eres él respondiendo por ${canal}. No hables de él en tercera persona.
 
@@ -288,41 +381,70 @@ ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
 
-${vacante ? `VACANTE ENLAZADA A ESTE HILO
-  Puesto: ${vacante.titulo} — ${vacante.empresa}
+${reglasDeEstilo()}
+
+${
+  vacante
+    ? `VACANTE ENLAZADA A ESTE HILO
+  Puesto: ${vacante.titulo} en ${vacante.empresa}
   Modalidad: ${vacante.modalidad} | Ubicación: ${vacante.ubicacion} | Salario: ${vacante.salario || "no publicado"}
   Descripción:
   """
   ${vacante.descripcion.slice(0, 18000)}
   """
-${vacante.analisis ? `  Ángulo a vender: ${vacante.analisis.anguloRecomendado}
-  Brechas conocidas: ${vacante.analisis.brechas.map((b) => `${b.brecha} → ${b.mitigacion}`).join(" | ")}
-  Banderas rojas detectadas: ${vacante.analisis.banderasRojas.join(" | ") || "ninguna"}` : ""}` : "No hay ninguna vacante enlazada a este hilo todavía."}
+${
+  vacante.analisis
+    ? `  Ángulo a vender: ${vacante.analisis.anguloRecomendado}
+  Brechas conocidas: ${vacante.analisis.brechas.map((b) => `${b.brecha} -> ${b.mitigacion}`).join(" | ")}
+  Banderas rojas detectadas: ${vacante.analisis.banderasRojas.join(" | ") || "ninguna"}`
+    : ""
+}`
+    : "No hay ninguna vacante enlazada a este hilo todavía."
+}
+
+${bloqueMaterial}
 
 INTERLOCUTOR: ${contacto}
 
 HILO COMPLETO, del más antiguo al más reciente:
-${hilo.map((m, i) => `[${i + 1}] ${m.de === "yo" ? p.nombre.split(" ")[0].toUpperCase() : "RECLUTADOR"}${m.fecha ? ` (${m.fecha})` : ""}:\n${m.texto}`).join("\n\n")}
+${hilo
+  .map(
+    (m, i) =>
+      `[${i + 1}] ${m.de === "yo" ? p.nombre.split(" ")[0].toUpperCase() : "RECLUTADOR"}${m.fecha ? ` (${m.fecha})` : ""}:\n${m.texto}`
+  )
+  .join("\n\n")}
 
-${instrucciones ? `LO QUE EL CANDIDATO QUIERE QUE DIGAS O CONSIGAS EN ESTE MENSAJE:\n"""\n${instrucciones}\n"""` : "No hay instrucción específica: responde a lo último que dijo el reclutador y haz avanzar el proceso."}
+${
+  instrucciones
+    ? `LO QUE EL CANDIDATO QUIERE QUE DIGAS O CONSIGAS EN ESTE MENSAJE:\n"""\n${instrucciones}\n"""\nEsto manda sobre cualquier otra consideración de estilo.`
+    : "No hay instrucción específica: responde a lo último que dijo el reclutador y haz avanzar el proceso."
+}
 
 Devuelve el JSON pedido. Instrucciones por campo:
 
 - respuesta: el mensaje listo para enviar, en ${lang}, tono ${tono}. ${limites[canal] ?? limites.otro}
-  * Responde primero a lo que te acaban de preguntar. Nada de recapitular todo el hilo.
-  * Si el reclutador dejó SIN RESPONDER una pregunta que ${p.nombre} ya hizo antes, vuelve a plantearla una sola vez, de forma cortés pero clara, dando una razón por la que la necesitas.
+
+  ${reglaSaludo}
+
+  * Responde primero a lo último que te han dicho. Nada de recapitular el hilo.
+  * DEMUESTRA QUE LEÍSTE EL MATERIAL. Si hay documentos o descripción del puesto, menciona UN detalle concreto de ellos (el nicho, una herramienta, una cifra, el tipo de cliente) y engánchalo con un hecho real de tu perfil. Un detalle bien elegido convence más que tres frases de entusiasmo.
+  * NO OFREZCAS TU EXPECTATIVA SALARIAL por tu cuenta, ni siquiera si te la han pedido, salvo que las instrucciones te digan explícitamente que la des. Dar un número antes de conocer el alcance del trabajo juega en contra. Si te la han pedido, redirige pidiendo primero los datos que faltan para poder dar una cifra con sentido, y anótalo en "avisos" para que lo decida ${p.nombre}.
+  * UNA SOLA PETICIÓN CLARA. Máximo dos preguntas, y relacionadas entre sí. Si hay cinco cosas por saber, pregunta las dos que desbloquean el proceso y guarda el resto para el siguiente mensaje.
+  * Si el reclutador dejó SIN RESPONDER una pregunta que ${p.nombre} ya hizo antes, vuelve a plantearla una sola vez, con una razón por la que la necesitas.
   * Si te piden algo concreto (enviar CV, confirmar una hora), confírmalo de forma explícita.
   * Si hay que confirmar una cita con hora en otro país, convierte la hora también a la de ${p.nombre} (${p.ubicacion}) para dejar constancia de que no hay malentendido.
   * Si un dato no está en el perfil, usa un marcador [COMPLETAR: …]. NO lo inventes.
+
 - asunto: solo si el canal es "email"; en el resto devuelve cadena vacía.
-- variantes: 2 versiones alternativas, una más corta y una más formal.
-- pendientes: lo que el reclutador ha pedido en el hilo y todavía no consta que se haya hecho (enviar CV, mandar portafolio, rellenar un formulario, confirmar disponibilidad). Frases accionables que empiecen por verbo.
+- variantes: 2 alternativas que cambien de ESTRATEGIA, no solo de tono. Una debe ser claramente más corta que la principal, en torno a la mitad. La otra puede apostar por algo distinto: pedir otro dato, subrayar otro punto del perfil, o cerrar proponiendo una llamada.
+- pendientes: lo que el reclutador ha pedido y todavía no consta que se haya hecho. Frases CORTAS que empiecen por verbo, una por tarea. No repitas la misma tarea con otras palabras ni le añadas condiciones del tipo "si lo solicita" o "cuando aclare los detalles": eso convierte la lista en ruido. "Enviar CV actualizado" y nada más.
 - preguntasSinResponder: preguntas que EL CANDIDATO hizo en el hilo y que el reclutador aún no ha contestado. Vacío si no hay ninguna.
 - incoherencias: ESTA ES LA PARTE MÁS IMPORTANTE. Revisa todo lo que ${p.nombre} afirmó en sus propios mensajes del hilo y compáralo con el PERFIL. Marca cualquier afirmación que el perfil NO respalde: una herramienta que dijo dominar y que no está en Habilidades, un nivel de experiencia inflado, una métrica que no existe en sus logros, un idioma sin declarar. Para cada una: la afirmación literal, por qué es un problema, y cómo reencuadrarla de forma honesta si se lo preguntan. Si todo cuadra con el perfil, devuelve lista vacía. NO inventes incoherencias para rellenar.
-- avisos: cualquier otra cosa que ${p.nombre} deba revisar antes de enviar.`;
+- avisos: lo que ${p.nombre} deba decidir o revisar antes de enviar. Incluye SIEMPRE que aplique:
+  * Si el reclutador ha pedido la expectativa salarial y no se la has dado, dilo aquí junto al número que figura en el perfil, para que él decida si lo manda.
+  * Si el hilo está escrito en un idioma distinto al que has usado para responder, avísalo: contestar en español a quien escribe en inglés se nota.
+  * Cualquier dato que hayas dejado como [COMPLETAR: …].`;
 }
-
-// ------------------------------------------------- carta y mensajes
 
 export function promptCarta(
   p: PerfilMaestro,
@@ -336,6 +458,8 @@ export function promptCarta(
 ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
 
 VACANTE OBJETIVO
   Puesto: ${v.titulo} — ${v.empresa}
@@ -379,6 +503,8 @@ export function promptEntrevista(
 ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
 
 VACANTE
   Puesto: ${v.titulo} — ${v.empresa}
@@ -438,6 +564,8 @@ export function promptDocumento(
 ${perfilComoTexto(p)}
 
 ${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
 
 DOCUMENTO: "${nombreArchivo}"
 ${contexto ? `CONTEXTO: ${contexto}` : ""}

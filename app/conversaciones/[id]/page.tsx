@@ -18,6 +18,7 @@ import {
 import { useApp } from "@/lib/contexto";
 import { parsearVacante, redactarEnHilo, type RespuestaHilo } from "@/lib/gemini";
 import { CANALES, type Idioma } from "@/lib/types";
+import { juntarPendientes } from "@/lib/pendientes";
 import { nuevoId } from "@/lib/store";
 import { Alerta, BotonCopiar, Cargando, EsqueletoDetalle, Modal, Vacio } from "@/components/ui";
 import Adjuntos from "@/components/Adjuntos";
@@ -104,16 +105,15 @@ export default function Hilo({ params }: { params: Promise<{ id: string }> }) {
       );
       setRes(r);
       // Fusiona los pendientes nuevos sin perder los que ya marcaste hechos.
-      const yaConocidos = new Set(
-        conv!.pendientes.map((p) => p.que.toLowerCase().trim())
-      );
       actualizarConversacion(conv!.id, {
-        pendientes: [
-          ...conv!.pendientes,
-          ...r.pendientes
-            .filter((q) => !yaConocidos.has(q.toLowerCase().trim()))
-            .map((q) => ({ id: nuevoId("pend"), que: q, hecho: false })),
-        ],
+        // Se comparan por significado, no por cadena exacta: el motor vuelve a
+        // listar lo mismo con otras palabras en cada redacción, y comparando
+        // literales la lista llegó a tener nueve entradas para dos tareas.
+        pendientes: juntarPendientes(conv!.pendientes, r.pendientes, (que) => ({
+          id: nuevoId("pend"),
+          que,
+          hecho: false,
+        })),
         preguntasSinResponder: r.preguntasSinResponder,
         incoherencias: r.incoherencias,
       });

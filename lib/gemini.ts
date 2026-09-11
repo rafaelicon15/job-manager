@@ -703,7 +703,11 @@ export function redactarEnHilo(
       vacante,
       instrucciones,
       idioma,
-      tono
+      tono,
+      // El material del reclutador se junta de los dos sitios donde puede
+      // estar: el hilo y la ficha de la vacante. Sin esto el motor ignoraba
+      // el PDF que acababan de mandar y había que pegarle a mano lo que decía.
+      [...conversacion.adjuntos, ...(vacante?.adjuntos ?? [])]
     ),
     esquemaHilo
   );
