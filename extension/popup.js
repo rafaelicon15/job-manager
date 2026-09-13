@@ -193,7 +193,16 @@ document.getElementById("sincronizar").addEventListener("click", async () => {
       return;
     }
     await chrome.storage.local.set({ ficha: result.ficha, fichaFecha: Date.now() });
-    decir(`Datos guardados (${result.ficha.nombre}). Ya puedes rellenar formularios.`, "ok");
+    // La URL de la app se deduce de la propia pestaña desde la que sincronizas.
+    // Pedirla aparte sobraba: si estás en la app, ya la sabemos, y tener que
+    // escribirla a mano dejaba los otros botones inutilizables sin razón.
+    const origen = new URL(tab.url).origin;
+    $app.value = origen;
+    await chrome.storage.sync.set({ appUrl: origen });
+    decir(
+      `Datos guardados (${result.ficha.nombre}) y URL detectada. Ya puedes rellenar formularios.`,
+      "ok"
+    );
   } catch (e) {
     decir(`No se pudo leer: ${e.message}`, "err");
   }
@@ -242,6 +251,27 @@ document.getElementById("rellenar").addEventListener("click", async () => {
       `${result.escritos} campos rellenos, ${result.pendientes} en ámbar para que los contestes tú. ` +
         `Revisa TODO antes de enviar: el envío es tuyo.${detalle}${aviso}`,
       result.escritos ? "ok" : "info"
+    );
+
+    // Si quedan preguntas abiertas, se pasan al motor sin que haya que pulsar
+    // otro botón: son justo las que el autorrelleno no puede contestar, y
+    // dejarlas ahí obligaba a saber que existía un segundo paso.
+    const base = $app.value.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\/.+/.test(base)) return;
+    const [{ result: preg }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: recogerPreguntas,
+    });
+    if (!preg?.preguntas?.length) return;
+    await chrome.tabs.create({
+      url: `${base}/responder#${aBase64Url(preg)}`,
+      active: false,
+    });
+    decir(
+      `${result.escritos} campos rellenos y ${result.pendientes} en ámbar. ` +
+        `Abrí una pestaña con ${preg.preguntas.length} preguntas para que las redacte el motor. ` +
+        `Revisa TODO antes de enviar: el envío es tuyo.${aviso}`,
+      "ok"
     );
   } catch (e) {
     decir(`No se pudo rellenar: ${e.message}`, "err");

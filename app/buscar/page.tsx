@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
+import { claveVacante } from "@/lib/duplicados";
 import { triarLote } from "@/lib/gemini";
 import type { VacanteCruda } from "@/app/api/jobs/route";
 import { Alerta, Cargando, Puntaje, Vacio, colorPuntaje } from "@/components/ui";
@@ -45,13 +46,12 @@ export default function Buscar() {
   // Evita ofrecer "guardar" algo que ya está en el tablero.
   const yaGuardadas = useMemo(
     () =>
-      new Set(
-        vacantes.map((v) => `${v.empresa}|${v.titulo}`.toLowerCase().replace(/[^a-z0-9|]/g, ""))
-      ),
+      new Set(vacantes.map((v) => claveVacante(v.titulo, v.empresa))),
     [vacantes]
   );
-  const claveDe = (v: VacanteCruda) =>
-    `${v.empresa}|${v.titulo}`.toLowerCase().replace(/[^a-z0-9|]/g, "");
+  // Misma regla que al capturar con la extensión o pegar a mano, para que una
+  // oferta no se considere repetida en un sitio y nueva en otro.
+  const claveDe = (v: VacanteCruda) => claveVacante(v.titulo, v.empresa);
 
   const buscar = useCallback(async () => {
     setBuscando(true);

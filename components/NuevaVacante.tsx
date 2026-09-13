@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Link2, ClipboardPaste, Wand2 } from "lucide-react";
+import { Link2, ClipboardPaste, Wand2, CopyCheck } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { parsearVacante } from "@/lib/gemini";
+import { buscarDuplicada } from "@/lib/duplicados";
 import { Alerta, Cargando } from "@/components/ui";
 
 /**
@@ -32,6 +33,9 @@ export default function NuevaVacante({
   const [texto, setTexto] = useState(textoInicial);
   const [cargando, setCargando] = useState("");
   const [error, setError] = useState("");
+  /** Vacante ya guardada que es la misma que esta. */
+  const [repetida, setRepetida] = useState<{ id: string; titulo: string } | null>(null);
+  const [guardarIgual, setGuardarIgual] = useState(false);
 
   async function traerDeUrl() {
     setCargando("Descargando la oferta…");
@@ -80,6 +84,23 @@ export default function NuevaVacante({
           descripcion: texto,
         };
       }
+      // La misma oferta llega por la búsqueda, por la extensión desde el
+      // portal y otra vez al abrir el formulario. Sin esta comprobación la
+      // lista de postulaciones acaba con la misma vacante tres veces y el
+      // seguimiento deja de servir.
+      const ya = guardarIgual
+        ? undefined
+        : buscarDuplicada(estado.vacantes, {
+            titulo: datos.titulo || "",
+            empresa: datos.empresa || "",
+            url: url || undefined,
+          });
+      if (ya) {
+        setRepetida({ id: ya.id, titulo: ya.titulo });
+        setCargando("");
+        return;
+      }
+
       const v = agregarVacante({
         titulo: datos.titulo || "Vacante sin título",
         empresa: datos.empresa || "",
@@ -157,6 +178,39 @@ export default function NuevaVacante({
       )}
 
       {error && <Alerta tipo="error">{error}</Alerta>}
+
+      {repetida && (
+        <Alerta tipo="aviso">
+          <p className="mb-1 flex items-center gap-1.5 font-semibold">
+            <CopyCheck size={14} /> Esta vacante ya la tienes guardada
+          </p>
+          <p className="mb-2.5 leading-relaxed">
+            “{repetida.titulo}”. Si la guardas otra vez tendrás la misma oferta
+            dos veces en tus postulaciones, con su propio seguimiento.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn btn-primario py-1.5 text-xs"
+              onClick={() =>
+                onListo
+                  ? onListo(repetida.id)
+                  : router.push(`/vacantes/${repetida.id}`)
+              }
+            >
+              Abrir la que ya tengo
+            </button>
+            <button
+              className="btn py-1.5 text-xs"
+              onClick={() => {
+                setGuardarIgual(true);
+                setRepetida(null);
+              }}
+            >
+              Guardar otra copia igualmente
+            </button>
+          </div>
+        </Alerta>
+      )}
       {!ajustes.geminiApiKey && (
         <Alerta tipo="aviso">
           Sin API key de Gemini la vacante se guardará en crudo, sin estructurar.
