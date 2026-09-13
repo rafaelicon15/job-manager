@@ -247,3 +247,33 @@ document.getElementById("rellenar").addEventListener("click", async () => {
     decir(`No se pudo rellenar: ${e.message}`, "err");
   }
 });
+
+document.getElementById("preguntas").addEventListener("click", async () => {
+  const base = $app.value.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/.+/.test(base)) {
+    decir("Primero escribe y guarda la URL de tu Job Manager.", "err");
+    return;
+  }
+  decir("Buscando las preguntas del formulario…");
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || /^(chrome|edge|about|chrome-extension):/.test(tab.url || "")) {
+      decir("Abre el formulario de postulación en una pestaña normal.", "err");
+      return;
+    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: recogerPreguntas,
+    });
+    if (!result?.preguntas?.length) {
+      decir("No encontré preguntas abiertas sin contestar en esta página.", "info");
+      return;
+    }
+    // Viajan en el fragmento de la URL, que nunca llega al servidor.
+    await chrome.tabs.create({ url: `${base}/responder#${aBase64Url(result)}` });
+    decir(`${result.preguntas.length} preguntas enviadas a tu Job Manager.`, "ok");
+    window.close();
+  } catch (e) {
+    decir(`No se pudieron leer las preguntas: ${e.message}`, "err");
+  }
+});

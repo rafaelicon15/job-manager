@@ -268,3 +268,93 @@ function rellenarFormulario(ficha) {
     sinDato: marcados.filter((m) => m.tipo === "sinDato").map((m) => m.etiqueta).slice(0, 8),
   };
 }
+
+/**
+ * Recoge las preguntas abiertas del formulario que siguen sin contestar, para
+ * mandarlas al Job Manager y que el motor redacte una respuesta con el perfil.
+ *
+ * Se inyecta igual que rellenarFormulario, así que también debe ser
+ * autocontenida. No escribe nada: solo lee.
+ *
+ * El criterio de "pregunta del empleador" es el que se ve en los portales: un
+ * campo vacío cuya etiqueta es una frase, no una palabra. "Nombre" no lo es;
+ * "¿Qué experiencia tienes con GoHighLevel?" sí. Se incluyen también los
+ * campos cortos que el autorrelleno dejó en ámbar, porque ahí caen cosas como
+ * el sí/no del rango salarial.
+ */
+function recogerPreguntas() {
+  const PROHIBIDOS =
+    /pass|contrase|clave|pwd|tarjeta|card|cvv|cvc|iban|cuenta|swift|dni|nif|nie|curp|rfc|seguridad social|passport|pasaporte/i;
+
+  function etiquetaDe(el) {
+    const texto = (n) => (n ? (n.innerText || n.textContent || "").trim() : "");
+    const util = (t) => t && t.length >= 2 && t.length <= 400;
+    if (el.id) {
+      const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      if (util(texto(l))) return texto(l);
+    }
+    const envolvente = el.closest("label");
+    if (util(texto(envolvente))) return texto(envolvente);
+    for (const id of (el.getAttribute("aria-labelledby") || "").split(/\s+/)) {
+      const t = texto(document.getElementById(id));
+      if (util(t)) return t;
+    }
+    let hermano = el.previousElementSibling;
+    for (let i = 0; hermano && i < 3; i++) {
+      const t = texto(hermano);
+      if (util(t)) return t;
+      hermano = hermano.previousElementSibling;
+    }
+    let padre = el.parentElement;
+    for (let i = 0; padre && i < 4; i++) {
+      const propio = texto(padre);
+      if (util(propio)) return propio;
+      const anterior = texto(padre.previousElementSibling);
+      if (util(anterior)) return anterior;
+      padre = padre.parentElement;
+    }
+    return el.placeholder || el.name || "";
+  }
+
+  const preguntas = [];
+  const vistas = new Set();
+
+  for (const el of document.querySelectorAll("input, textarea")) {
+    if (el.disabled || el.readOnly) continue;
+    if (el instanceof HTMLInputElement) {
+      const t = (el.type || "").toLowerCase();
+      if (!["text", "search", "url", "tel", "email", ""].includes(t)) continue;
+    }
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    if ((el.value ?? "").trim()) continue; // ya contestada
+
+    const etiqueta = etiquetaDe(el).replace(/\s+/g, " ").trim();
+    if (!etiqueta || PROHIBIDOS.test(etiqueta)) continue;
+
+    // Una etiqueta de una o dos palabras es un campo de datos, no una
+    // pregunta. Se exige una frase, o un signo de interrogación.
+    const esPregunta =
+      etiqueta.length >= 25 || /[?¿]/.test(etiqueta) || el instanceof HTMLTextAreaElement;
+    if (!esPregunta) continue;
+
+    const clave = etiqueta.toLowerCase();
+    if (vistas.has(clave)) continue;
+    vistas.add(clave);
+
+    preguntas.push({
+      texto: etiqueta.slice(0, 400),
+      largo: el instanceof HTMLTextAreaElement,
+    });
+  }
+
+  // Contexto para que el motor sepa a qué vacante pertenecen.
+  const meta = (prop) =>
+    document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`)?.content || "";
+
+  return {
+    preguntas: preguntas.slice(0, 12),
+    titulo: (meta("og:title") || document.title || "").slice(0, 200),
+    url: location.href,
+  };
+}

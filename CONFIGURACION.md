@@ -143,6 +143,12 @@ portal, pulsa **Rellenar este formulario**.
 
 Lo rellenado sale en **verde**; lo que queda pendiente, en **ámbar**.
 
+**Responder sus preguntas con IA.** Lo que el autorrelleno deja en ámbar no
+siempre es un descuido: "¿qué experiencia tienes con [herramienta] y qué
+resultados conseguiste?" no se copia de una ficha. Ese botón recoge esas
+preguntas y las abre en la app, que las redacta contra tu perfil maestro con las
+mismas reglas de honestidad que el resto. Tú revisas, copias y pegas.
+
 Lo que no hace, por diseño:
 
 - **No envía nunca el formulario.** El botón de postular lo pulsas tú.
