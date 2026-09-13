@@ -61,6 +61,10 @@ export interface PerfilMaestro {
   email: string;
   telefono: string;
   ubicacion: string;
+  /** Código postal. Lo piden muchos formularios y no se deduce de la ciudad. */
+  codigoPostal?: string;
+  /** Fecha de nacimiento en AAAA-MM-DD, que es lo que espera un input date. */
+  fechaNacimiento?: string;
   links: { etiqueta: string; url: string }[];
   resumen: string;
   resumenEn: string;

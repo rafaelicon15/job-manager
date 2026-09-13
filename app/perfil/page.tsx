@@ -78,6 +78,18 @@ export default function Perfil() {
             valor={p.ubicacion}
             onChange={(v) => set({ ubicacion: v })}
           />
+          <Campo
+            label="Código postal"
+            valor={p.codigoPostal ?? ""}
+            onChange={(v) => set({ codigoPostal: v })}
+          />
+          <Campo
+            label="Fecha de nacimiento"
+            valor={p.fechaNacimiento ?? ""}
+            onChange={(v) => set({ fechaNacimiento: v })}
+            tipo="date"
+            ayuda="Opcional. Solo para que la extensión rellene los formularios que la piden. No sale en el CV ni se manda a ningún sitio."
+          />
         </div>
         <Campo
           label="Titular (español)"
@@ -603,21 +615,29 @@ function Campo({
   valor,
   onChange,
   placeholder,
+  tipo = "text",
+  ayuda,
 }: {
   label: string;
   valor: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  tipo?: string;
+  ayuda?: string;
 }) {
   return (
     <div>
       <label className="etiqueta">{label}</label>
       <input
         className="campo"
+        type={tipo}
         value={valor}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+      {ayuda && (
+        <p className="mt-1 text-xs leading-relaxed text-[var(--color-suave)]">{ayuda}</p>
+      )}
     </div>
   );
 }

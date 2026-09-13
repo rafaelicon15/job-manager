@@ -148,6 +148,10 @@ function rellenarFormulario(ficha) {
       ficha.salario,
     ],
     [/disponibilidad|incorporaci[óo]n|fecha de inicio|availability|notice period/, ficha.disponibilidad],
+    // Los límites de palabra importan: "cp" suelto coincidiría dentro de
+    // "ocupación", y "dob" dentro de "doble".
+    [/c[óo]digo postal|post ?code|postal code|zip ?code|\bc\.?p\.?\b|\bzip\b/, ficha.codigoPostal],
+    [/fecha de nacimiento|birth ?date|date of birth|\bdob\b|cumplea[ñn]os|nacimiento/, ficha.fechaNacimiento],
     [/ciudad|localidad|city/, ficha.ciudad],
     [/pa[íi]s|country/, ficha.pais],
     [/direcci[óo]n|address/, ficha.ciudad],
@@ -203,8 +207,13 @@ function rellenarFormulario(ficha) {
     // como esta es peor que rellenarlo: se enviaria "Argentina" a alguien de
     // Venezuela sin que nadie lo haya decidido. Si el indice es 0 se trata
     // como sin elegir; si es mayor, lo eligio el usuario y no se toca.
-    const porDefecto = el instanceof HTMLSelectElement && el.selectedIndex <= 0;
-    if (!porDefecto && (el.value ?? "").trim()) continue;
+    // Los desplegables se examinan siempre. "Tener valor" no significa que lo
+    // haya elegido nadie: muchos portales preseleccionan por IP. Medido en
+    // HireSkys, el país venía en "Pakistan" mientras la ciudad decía "Maracay";
+    // enviar eso es peor que cualquier campo en blanco. La decisión de tocarlo
+    // o no se toma abajo, y solo se pisa una selección con una coincidencia
+    // exacta, avisando en ámbar.
+    if (!(el instanceof HTMLSelectElement) && (el.value ?? "").trim()) continue;
 
     let valor = "";
     // Una pregunta abierta no se contesta con un dato de la ficha, y buscarle
@@ -229,23 +238,44 @@ function rellenarFormulario(ficha) {
       // asi que la primera opcion vacia se llevaba todas las coincidencias.
       const buscado = valor.toLowerCase().trim();
       const opciones = [...el.options].filter((o) => o.text.trim() && o.value !== "");
-      const opcion =
-        opciones.find((o) => o.text.toLowerCase().trim() === buscado) ||
+      const exacta = opciones.find((o) => o.text.toLowerCase().trim() === buscado);
+      const aproximada =
         opciones.find((o) => o.text.toLowerCase().includes(buscado)) ||
         opciones.find((o) => buscado.includes(o.text.toLowerCase().trim()));
+
+      // "Sin elegir" es que la opción activa no tenga valor, que es como se
+      // marca un "-- Selecciona --". El índice 0 no sirve de criterio: en un
+      // desplegable de países sin marcador, la primera opción es un país de
+      // verdad, y tratarla como vacía dejaba pasar coincidencias aproximadas
+      // que pisaban una elección real.
+      //
+      // Sin elegir: vale cualquier coincidencia. Ya elegido: solo se pisa con
+      // una EXACTA. "Venezuela" contra "Pakistan" es exacta y hay que
+      // corregirla; "Venezuela" contra "Venezuela (Bolivariana)" no lo es, y
+      // ahí es mejor avisar que decidir por él.
+      const sinElegir = !(el.value ?? "").trim();
+      const opcion = sinElegir ? (exacta ?? aproximada) : exacta;
+
       if (opcion) {
-        const habiaAlgo = (el.value ?? "").trim() && el.value !== opcion.value;
+        const habiaAlgo = !sinElegir && el.value !== opcion.value;
         escribir(el, opcion.value);
-        // Si se ha cambiado una seleccion que ya mostraba algo, se marca en
-        // ambar en vez de verde: el usuario tiene que verlo.
+        // Si se ha cambiado algo que ya mostraba otra cosa, se marca en ámbar
+        // en vez de verde: el usuario tiene que verlo.
         resaltar(
           el,
           habiaAlgo ? "#fbbf24" : "#34d399",
-          habiaAlgo ? "Cambiado desde el valor por defecto. Comprueba que es correcto." : ""
+          habiaAlgo
+            ? `Estaba en otra opción y se cambió a "${opcion.text.trim()}". Compruébalo.`
+            : ""
         );
         escritos++;
-      } else {
+      } else if (sinElegir) {
         resaltar(el, "#fbbf24", "No encontré una opción que encaje. Elige tú.");
+        pendientes++;
+      } else {
+        // Ya tenía algo elegido y no hay coincidencia exacta: se deja como
+        // está, pero se avisa por si lo puso el portal y no él.
+        resaltar(el, "#fbbf24", "Comprueba esta opción: puede venir puesta por el portal.");
         pendientes++;
       }
       continue;

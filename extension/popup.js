@@ -160,6 +160,8 @@ function leerFicha() {
       telefono: p.telefono || "",
       ciudad: ciudad || "",
       pais: resto.join(", ") || "",
+      codigoPostal: p.codigoPostal || "",
+      fechaNacimiento: p.fechaNacimiento || "",
       titular: p.titular || "",
       resumen: p.resumen || "",
       linkedin: enlace(/linkedin/i),

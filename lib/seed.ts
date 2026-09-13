@@ -18,6 +18,8 @@ export const PERFIL_INICIAL: PerfilMaestro = {
   email: "",
   telefono: "",
   ubicacion: "",
+  codigoPostal: "",
+  fechaNacimiento: "",
   links: [],
   resumen: "",
   resumenEn: "",
