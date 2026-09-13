@@ -174,22 +174,24 @@ document.getElementById("sincronizar").addEventListener("click", async () => {
   decir("Leyendo tu perfil…");
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const base = $app.value.trim().replace(/\/+$/, "");
-    // Se exige estar EN la pestaña de la app: así el permiso es activeTab y la
-    // extensión no necesita acceso permanente a ningún sitio.
-    if (!tab?.url || (base && !tab.url.startsWith(base))) {
-      decir(
-        "Abre tu Job Manager en esta pestaña y vuelve a pulsar. Los datos solo se leen desde ahí.",
-        "err"
-      );
+    if (!tab?.id || /^(chrome|edge|about|chrome-extension):/.test(tab.url || "")) {
+      decir("Abre tu Job Manager en esta pestaña y vuelve a pulsar.", "err");
       return;
     }
+    // No se comprueba la URL contra el campo de texto: lo que demuestra que
+    // una pestaña es el Job Manager es que tenga el perfil guardado, no lo que
+    // haya escrito en una caja. Comparar con el campo hacía que una URL
+    // equivocada ahí dentro bloqueara la sincronización aun estando en la app,
+    // que es justo el momento en que hay que poder arreglarla.
     const [{ result }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: leerFicha,
     });
     if (result?.error) {
-      decir(result.error, "err");
+      decir(
+        `${result.error} ¿Seguro que esta pestaña es tu Job Manager?`,
+        "err"
+      );
       return;
     }
     await chrome.storage.local.set({ ficha: result.ficha, fichaFecha: Date.now() });
@@ -200,7 +202,8 @@ document.getElementById("sincronizar").addEventListener("click", async () => {
     $app.value = origen;
     await chrome.storage.sync.set({ appUrl: origen });
     decir(
-      `Datos guardados (${result.ficha.nombre}) y URL detectada. Ya puedes rellenar formularios.`,
+      `Datos guardados (${result.ficha.nombre}). URL detectada: ${origen}. ` +
+        `Ya puedes rellenar formularios.`,
       "ok"
     );
   } catch (e) {

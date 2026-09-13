@@ -17,6 +17,16 @@ const RASTREO =
   /^(utm_|fbclid|gclid|msclkid|ref|referer|referrer|source|src|trk|trackingid|origin|from|campaign|mc_|_ga)/i;
 
 /**
+ * Último tramo de la ruta que indica "aquí se rellena el formulario", no una
+ * oferta distinta. El formulario casi nunca vive en la misma URL que la
+ * descripción: Adzuna pasa de `/details/5863111426` a
+ * `/details/5863111426/apply`. Sin quitarlo, capturar desde la descripción y
+ * luego desde el formulario creaba dos vacantes para el mismo puesto.
+ */
+const PASO_DE_POSTULACION =
+  /\/(apply|application|aplicar|postular|postulacion|candidatura|solicitud|submit)$/i;
+
+/**
  * Normaliza una URL para poder compararla. Quita el fragmento, el `www`, la
  * barra final y los parámetros de seguimiento, pero CONSERVA el resto: en
  * varios portales el identificador de la oferta viaja en la query
@@ -33,7 +43,14 @@ export function normalizarUrl(bruta?: string): string {
     for (const clave of [...u.searchParams.keys()])
       if (RASTREO.test(clave)) u.searchParams.delete(clave);
     u.searchParams.sort();
-    return (u.origin + u.pathname.replace(/\/+$/, "") + u.search).toLowerCase();
+
+    // Se quita el tramo de postular, pero solo si queda ruta debajo: un
+    // dominio cuya ruta entera es "/apply" no se puede reducir a nada.
+    let ruta = u.pathname.replace(/\/+$/, "");
+    const sinPaso = ruta.replace(PASO_DE_POSTULACION, "");
+    if (sinPaso && sinPaso !== "/") ruta = sinPaso;
+
+    return (u.origin + ruta + u.search).toLowerCase();
   } catch {
     return bruta.trim().toLowerCase();
   }

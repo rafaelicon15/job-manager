@@ -403,5 +403,9 @@ function recogerPreguntas() {
     titulo: titulo.slice(0, 200),
     empresa: empresa.slice(0, 120),
     url: location.href,
+    // De dónde se llegó. Cuando el formulario vive en un ATS externo
+    // (Greenhouse, Workday, Lever), la URL de esta página no se parece en nada
+    // a la de la oferta guardada, pero el referente suele ser justo esa oferta.
+    desde: document.referrer || "",
   };
 }

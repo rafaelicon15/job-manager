@@ -19,6 +19,8 @@ interface Carga {
   titulo?: string;
   empresa?: string;
   url?: string;
+  /** De dónde se llegó al formulario. Ver el comentario en `sugerida`. */
+  desde?: string;
 }
 
 /** Decodifica el base64-URL con bytes UTF-8 que manda la extensión. */
@@ -91,6 +93,16 @@ export default function Responder() {
       url: carga.url,
     });
     if (exacta) return exacta;
+
+    // Si el formulario vive en un ATS externo, su URL no se parece a la de la
+    // oferta guardada, pero el referente suele ser esa misma oferta.
+    if (carga.desde) {
+      const porReferente = buscarDuplicada(estado.vacantes, {
+        titulo: carga.titulo,
+        url: carga.desde,
+      });
+      if (porReferente) return porReferente;
+    }
 
     // Último intento, más laxo: el título del formulario suele traer dentro el
     // del puesto, con algo delante o detrás.

@@ -63,3 +63,27 @@ test("la clave empresa+puesto es estable", () => {
   );
   assert.notEqual(claveVacante("CRO", "Acme"), claveVacante("CRO", "Otra"));
 });
+
+test("el formulario de postulación es la misma oferta que su descripción", () => {
+  // Adzuna: la descripción vive en /details/123 y el formulario en
+  // /details/123/apply. Capturar desde los dos sitios creaba dos vacantes.
+  assert.equal(id({ titulo: "X", url: "https://www.adzuna.com.mx/details/5236019813/apply" }), "1");
+  assert.equal(
+    id({ titulo: "X", url: "https://adzuna.com.mx/details/5236019813/apply?utm_source=email" }),
+    "1"
+  );
+});
+
+test("reconoce los distintos nombres del paso de postular", () => {
+  const base = "https://www.adzuna.com.mx/details/5236019813";
+  for (const paso of ["apply", "aplicar", "postular", "candidatura", "solicitud", "application"])
+    assert.equal(id({ titulo: "X", url: `${base}/${paso}` }), "1", `falla con /${paso}`);
+});
+
+test("no reduce una ruta que sea solo el paso de postular", () => {
+  assert.equal(normalizarUrl("https://empresa.com/apply"), "https://empresa.com/apply");
+});
+
+test("quitar el paso no funde ofertas distintas", () => {
+  assert.equal(id({ titulo: "X", url: "https://www.adzuna.com.mx/details/9999999/apply" }), null);
+});
