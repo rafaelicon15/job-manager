@@ -40,7 +40,7 @@ export function normalizarUrl(bruta?: string): string {
 }
 
 /** Texto comparable: sin acentos, sin signos y sin espacios de más. */
-function normalizar(t: string): string {
+export function normalizar(t: string): string {
   return t
     .toLowerCase()
     .normalize("NFD")

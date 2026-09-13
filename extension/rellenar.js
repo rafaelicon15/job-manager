@@ -33,57 +33,66 @@ function rellenarFormulario(ficha) {
   function describir(el) {
     const texto = (n) => (n ? (n.innerText || n.textContent || "").trim() : "");
     const util = (t) => t && t.length >= 2 && t.length <= 300;
-    const partes = [];
 
-    // 1. La etiqueta asociada por `for`.
-    if (el.id) {
-      const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (l) partes.push(texto(l));
+    // Se busca UNA etiqueta, no todas. Acumular candidatas provocaba
+    // contaminación entre campos: en un formulario plano el contenedor del
+    // campo "Nombre completo" es el <form> entero, cuyo texto incluye "Correo
+    // electrónico", y el nombre acababa relleno con la dirección de correo.
+    // Se devuelve la primera vía que acierte, de la más fiable a la más
+    // aproximada, y solo se llega a la última si no hay nada mejor.
+    function etiqueta() {
+      // 1. La etiqueta asociada por `for`.
+      if (el.id) {
+        const t = texto(document.querySelector(`label[for="${CSS.escape(el.id)}"]`));
+        if (util(t)) return t;
+      }
+
+      // 2. Una etiqueta que envuelve al campo.
+      const env = texto(el.closest("label"));
+      if (util(env)) return env;
+
+      // 3. aria-labelledby, que apunta a otro elemento por id.
+      for (const id of (el.getAttribute("aria-labelledby") || "").split(/\s+/)) {
+        if (!id) continue;
+        const t = texto(document.getElementById(id));
+        if (util(t)) return t;
+      }
+
+      // 4. Hermanos previos del propio campo. Aquí vive la etiqueta en la
+      //    mayoría de formularios sin `for`.
+      let hermano = el.previousElementSibling;
+      for (let i = 0; hermano && i < 3; i++) {
+        const t = texto(hermano);
+        if (util(t)) return t;
+        hermano = hermano.previousElementSibling;
+      }
+
+      // 5. Último recurso: subir por los contenedores. Solo se acepta uno que
+      //    contenga este campo y ningún otro, para no arrastrar las etiquetas
+      //    de los vecinos.
+      let padre = el.parentElement;
+      for (let i = 0; padre && i < 4; i++) {
+        if (padre.querySelectorAll("input, textarea, select").length > 1) break;
+        const propio = texto(padre);
+        if (util(propio)) return propio;
+        const anterior = texto(padre.previousElementSibling);
+        if (util(anterior)) return anterior;
+        padre = padre.parentElement;
+      }
+      return "";
     }
 
-    // 2. Una etiqueta que envuelve al campo.
-    const envolvente = el.closest("label");
-    if (envolvente) partes.push(texto(envolvente));
-
-    // 3. aria-labelledby, que apunta a otro elemento por id.
-    for (const id of (el.getAttribute("aria-labelledby") || "").split(/\s+/))
-      if (id) partes.push(texto(document.getElementById(id)));
-
-    // 4. Hermanos previos del propio campo. Aquí es donde vive la etiqueta en
-    //    la mayoría de formularios sin `for`.
-    let hermano = el.previousElementSibling;
-    for (let i = 0; hermano && i < 3; i++) {
-      const t = texto(hermano);
-      if (util(t)) {
-        partes.push(t);
-        break;
-      }
-      hermano = hermano.previousElementSibling;
-    }
-
-    // 5. Subiendo por los contenedores: el primero cuyo texto tenga tamaño de
-    //    etiqueta, o el hermano previo de ese contenedor.
-    let padre = el.parentElement;
-    for (let i = 0; padre && i < 4; i++) {
-      const propio = texto(padre);
-      if (util(propio)) {
-        partes.push(propio);
-        break;
-      }
-      const anterior = texto(padre.previousElementSibling);
-      if (util(anterior)) {
-        partes.push(anterior);
-        break;
-      }
-      padre = padre.parentElement;
-    }
-
-    // 6. Los atributos del propio campo.
-    partes.push(el.name || "", el.id || "", el.placeholder || "");
-    partes.push(el.getAttribute("aria-label") || "", el.getAttribute("title") || "");
-    partes.push(el.getAttribute("autocomplete") || "");
-
-    return partes
+    // Los atributos del propio campo sí se suman siempre: son suyos y no
+    // pueden venir de un campo vecino.
+    return [
+      etiqueta(),
+      el.name || "",
+      el.id || "",
+      el.placeholder || "",
+      el.getAttribute("aria-label") || "",
+      el.getAttribute("title") || "",
+      el.getAttribute("autocomplete") || "",
+    ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase()
@@ -307,6 +316,8 @@ function recogerPreguntas() {
     }
     let padre = el.parentElement;
     for (let i = 0; padre && i < 4; i++) {
+      // Un contenedor con varios campos mezclaría las etiquetas de todos.
+      if (padre.querySelectorAll("input, textarea, select").length > 1) break;
       const propio = texto(padre);
       if (util(propio)) return propio;
       const anterior = texto(padre.previousElementSibling);
@@ -348,13 +359,49 @@ function recogerPreguntas() {
     });
   }
 
-  // Contexto para que el motor sepa a qué vacante pertenecen.
+  // Contexto para reconocer de qué vacante son. En la página del formulario
+  // el <title> suele ser generico ("Aplicar al trabajo"), asi que se busca en
+  // varios sitios: primero el JSON-LD, que es el dato limpio cuando existe.
   const meta = (prop) =>
     document.querySelector(`meta[property="${prop}"], meta[name="${prop}"]`)?.content || "";
 
+  let titulo = "";
+  let empresa = "";
+  for (const n of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      const bruto = JSON.parse(n.textContent);
+      const lista = Array.isArray(bruto) ? bruto : [bruto, ...(bruto["@graph"] || [])];
+      for (const it of lista) {
+        if (it && it["@type"] === "JobPosting") {
+          titulo = it.title || titulo;
+          empresa =
+            (typeof it.hiringOrganization === "string"
+              ? it.hiringOrganization
+              : it.hiringOrganization?.name) || empresa;
+        }
+      }
+    } catch {
+      // JSON-LD roto: se sigue con el resto de vías.
+    }
+  }
+
+  // El h1 de estas páginas es del tipo "Candidatura para <puesto>". Se le
+  // quita ese prefijo, que no forma parte del nombre del puesto y estropearía
+  // la comparación con la vacante guardada.
+  if (!titulo) {
+    const h1 = document.querySelector("h1");
+    // innerText no existe en todos los entornos; textContent siempre está.
+    const textoH1 = h1 ? (h1.innerText || h1.textContent || "") : "";
+    titulo = (textoH1 || meta("og:title") || document.title || "").trim();
+  }
+  titulo = titulo
+    .replace(/^\s*(candidatura para|postulaci[óo]n a|solicitud para|apply (to|for)|application for)\s*:?\s*/i, "")
+    .trim();
+
   return {
     preguntas: preguntas.slice(0, 12),
-    titulo: (meta("og:title") || document.title || "").slice(0, 200),
+    titulo: titulo.slice(0, 200),
+    empresa: empresa.slice(0, 120),
     url: location.href,
   };
 }
