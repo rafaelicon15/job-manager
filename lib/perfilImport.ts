@@ -215,6 +215,13 @@ export function validarPerfilPegado(entrada: string): ResultadoImport {
     email: txt(p.email),
     telefono: txt(p.telefono),
     ubicacion: txt(p.ubicacion),
+    codigoPostal: txt(p.codigoPostal) || undefined,
+    // Un input date solo entiende AAAA-MM-DD. Cualquier otro formato se
+    // descarta en lugar de guardarse a medias: un campo de fecha con basura
+    // dentro no se puede ni corregir a mano sin borrarlo antes.
+    fechaNacimiento: /^\d{4}-\d{2}-\d{2}$/.test(txt(p.fechaNacimiento))
+      ? txt(p.fechaNacimiento)
+      : undefined,
     links: lista(p.links)
       .filter(esObj)
       .map((l) => ({ etiqueta: txt(l.etiqueta), url: txt(l.url) }))
@@ -254,6 +261,10 @@ export function validarPerfilPegado(entrada: string): ResultadoImport {
     preferencias,
   };
 
+  if (txt(p.fechaNacimiento) && !perfil.fechaNacimiento)
+    avisos.push(
+      `La fecha de nacimiento "${txt(p.fechaNacimiento)}" no está en formato AAAA-MM-DD y se descartó. Ponla a mano en el perfil.`
+    );
   if (!perfil.email && !perfil.telefono)
     avisos.push("Sin correo ni teléfono: el CV saldrá sin forma de contactarte.");
   if (!perfil.habilidades.length)

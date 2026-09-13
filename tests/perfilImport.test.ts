@@ -96,3 +96,30 @@ test("usa las líneas rojas por defecto si no vienen", () => {
   const r = validarPerfilPegado(JSON.stringify(minimo));
   assert.ok(r.perfil!.lineasRojas.length > 0, "nunca se queda sin límites");
 });
+
+test("lleva el código postal y la fecha de nacimiento al perfil", () => {
+  // Se añadieron al modelo pero no al importador, así que cargar un perfil
+  // desde una IA los perdía en silencio.
+  const r = validarPerfilPegado(
+    JSON.stringify({ ...minimo, codigoPostal: "46001", fechaNacimiento: "1988-03-02" })
+  );
+  assert.equal(r.perfil?.codigoPostal, "46001");
+  assert.equal(r.perfil?.fechaNacimiento, "1988-03-02");
+});
+
+test("descarta una fecha con formato equivocado y lo avisa", () => {
+  // Un input date no entiende "02/03/1988": guardarlo a medias deja un campo
+  // que no se puede ni corregir sin borrarlo antes.
+  const r = validarPerfilPegado(
+    JSON.stringify({ ...minimo, fechaNacimiento: "02/03/1988" })
+  );
+  assert.equal(r.perfil?.fechaNacimiento, undefined);
+  assert.ok(r.avisos.some((a) => /AAAA-MM-DD/.test(a)), "tiene que decir por qué la descartó");
+});
+
+test("sin esos campos el perfil sigue siendo válido", () => {
+  const r = validarPerfilPegado(JSON.stringify(minimo));
+  assert.ok(r.ok);
+  assert.equal(r.perfil?.codigoPostal, undefined);
+  assert.equal(r.perfil?.fechaNacimiento, undefined);
+});

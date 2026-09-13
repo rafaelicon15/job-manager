@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { promptHilo, reglasDeEstilo } from "../lib/prompts.ts";
+import { PROMPT_PERFIL_MAESTRO } from "../lib/promptPerfil.ts";
 import { PERFIL_INICIAL } from "../lib/seed.ts";
 import type { Adjunto, Vacante } from "../lib/types.ts";
 
@@ -137,4 +138,40 @@ test("el prompt se dirige al candidato por su nombre, no a uno fijo", () => {
   assert.match(abierto, /Ana Torres/);
   assert.match(otro, /Beatriz Serra/);
   assert.doesNotMatch(otro, /Ana Torres/, "el nombre sale del perfil, no del código");
+});
+
+test("el esquema del prompt del perfil es JSON válido", () => {
+  // Editar este prompt a mano es fácil de romper: una inserción mal puesta
+  // duplicó los campos dentro del bloque de experiencias y el JSON dejó de
+  // serlo, sin que nada fallara al compilar.
+  const bloque = PROMPT_PERFIL_MAESTRO.match(/```json\n([\s\S]*?)\n```/);
+  assert.ok(bloque, "no se encontró el bloque de esquema");
+  const o = JSON.parse(bloque![1]) as Record<string, unknown>;
+
+  for (const clave of [
+    "nombre",
+    "email",
+    "ubicacion",
+    "codigoPostal",
+    "fechaNacimiento",
+    "experiencias",
+    "habilidades",
+    "preferencias",
+    "lineasRojas",
+  ])
+    assert.ok(clave in o, `falta "${clave}" en el esquema`);
+});
+
+test("los campos de contacto no se cuelan dentro de las experiencias", () => {
+  const bloque = PROMPT_PERFIL_MAESTRO.match(/```json\n([\s\S]*?)\n```/);
+  const o = JSON.parse(bloque![1]) as { experiencias: Record<string, unknown>[] };
+  const exp = o.experiencias[0];
+  for (const clave of ["codigoPostal", "fechaNacimiento", "email", "telefono"])
+    assert.ok(!(clave in exp), `"${clave}" no pinta nada dentro de una experiencia`);
+  for (const clave of ["id", "puesto", "empresa", "desde", "hasta", "logros"])
+    assert.ok(clave in exp, `falta "${clave}" en la experiencia`);
+});
+
+test("el esquema pide no deducir la fecha de nacimiento", () => {
+  assert.match(PROMPT_PERFIL_MAESTRO, /no los deduzcas de la ciudad ni de la edad/i);
 });

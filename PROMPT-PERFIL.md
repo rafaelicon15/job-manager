@@ -30,6 +30,7 @@ Ese JSON va a alimentar una herramienta que analiza vacantes y redacta CV a medi
 - **No inventes métricas.** Si no te doy un número, deja el logro en cualitativo. Es preferible "reduje el tiempo de respuesta a leads" a un "-40%" que no puedo demostrar.
 - **No infles la responsabilidad.** Si colaboré en algo, el verbo es "colaboré", no "lideré".
 - **Distingue saber de haber usado.** Una herramienta que solo he tocado un rato va con nivel 1, nunca más.
+- El código postal y la fecha de nacimiento son opcionales y solo sirven para rellenar formularios. Si no te los doy, déjalos vacíos: no los deduzcas de la ciudad ni de la edad.
 - Si algo te falta y no te lo puedo dar, escribe literalmente `[COMPLETAR: qué falta]` en ese campo. No lo adivines.
 
 ## Los logros son la pieza central
@@ -61,6 +62,8 @@ Sé conservador. Un 4 mal puesto se cae en la primera entrevista técnica.
   "email": "correo@ejemplo.com",
   "telefono": "+00 000 0000000",
   "ubicacion": "Ciudad, País",
+  "codigoPostal": "Código postal, si lo sabes. Cadena vacía si no.",
+  "fechaNacimiento": "AAAA-MM-DD. Solo si te la doy yo. NO la deduzcas ni la inventes: déjala vacía.",
   "links": [{ "etiqueta": "LinkedIn", "url": "https://..." }],
   "resumen": "3 o 4 frases en español: qué hago, para quién y con qué resultados.",
   "resumenEn": "Lo mismo en inglés.",

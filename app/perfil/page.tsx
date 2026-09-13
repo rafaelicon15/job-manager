@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import ImportarPerfil from "@/components/ImportarPerfil";
@@ -610,6 +610,42 @@ function Bloque({ titulo, children }: { titulo: string; children: React.ReactNod
   );
 }
 
+/**
+ * Escribe en un estado local y solo avisa al salir del campo.
+ *
+ * Antes cada tecla guardaba el perfil entero en el navegador y redibujaba la
+ * página. En un campo de fecha eso rompía la escritura: el navegador mantiene
+ * tres segmentos (día, mes, año) con su propio estado interno, y devolvérselos
+ * reescritos a media pulsación los deja congelados en un año a medio teclear,
+ * del tipo "0008". También hacía que escribir un resumen largo guardara en
+ * disco una vez por letra.
+ *
+ * `useRef` guarda lo último que llegó de fuera: si el perfil cambia por otra
+ * vía —al cargarlo desde una IA, por ejemplo— el campo se actualiza, pero sin
+ * pisar lo que se esté escribiendo en ese momento.
+ */
+function useCampoLocal(valor: string, onChange: (v: string) => void) {
+  const [texto, setTexto] = useState(valor);
+  const ultimoExterno = useRef(valor);
+
+  if (valor !== ultimoExterno.current) {
+    ultimoExterno.current = valor;
+    if (valor !== texto) setTexto(valor);
+  }
+
+  return {
+    value: texto,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setTexto(e.target.value),
+    onBlur: () => {
+      if (texto !== ultimoExterno.current) {
+        ultimoExterno.current = texto;
+        onChange(texto);
+      }
+    },
+  };
+}
+
 function Campo({
   label,
   valor,
@@ -625,16 +661,11 @@ function Campo({
   tipo?: string;
   ayuda?: string;
 }) {
+  const enlace = useCampoLocal(valor, onChange);
   return (
     <div>
       <label className="etiqueta">{label}</label>
-      <input
-        className="campo"
-        type={tipo}
-        value={valor}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input className="campo" type={tipo} placeholder={placeholder} {...enlace} />
       {ayuda && (
         <p className="mt-1 text-xs leading-relaxed text-[var(--color-suave)]">{ayuda}</p>
       )}
@@ -651,14 +682,11 @@ function Area({
   valor: string;
   onChange: (v: string) => void;
 }) {
+  const enlace = useCampoLocal(valor, onChange);
   return (
     <div>
       <label className="etiqueta">{label}</label>
-      <textarea
-        className="campo min-h-[110px] resize-y"
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <textarea className="campo min-h-[110px] resize-y" {...enlace} />
     </div>
   );
 }
