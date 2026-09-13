@@ -11,7 +11,7 @@
 //  - Solo escribe datos que estén en la ficha del perfil. Lo que no sabe, lo
 //    marca en ámbar para que lo conteste el usuario.
 
-function rellenarFormulario(ficha) {
+async function rellenarFormulario(ficha) {
   /** Campos que no se tocan bajo ninguna circunstancia. */
   const PROHIBIDOS = /pass|contrase|clave|pwd|tarjeta|card|cvv|cvc|iban|cuenta|swift|dni|nif|nie|curp|rfc|seguridad social|passport|pasaporte/i;
 
@@ -298,10 +298,85 @@ function rellenarFormulario(ficha) {
     }
   }
 
+  // ------------------------------------------------ desplegables propios
+  //
+  // Muchos portales no usan un <select>, sino un componente propio: un div
+  // con role="combobox" que abre una lista al pulsarlo. En HireSkys el país
+  // es uno de esos, con su insignia "VE" al lado del nombre, y el código de
+  // arriba no lo ve siquiera.
+  //
+  // Se manejan aparte y con la mano muy suelta: solo se elige una opción si
+  // su texto coincide EXACTAMENTE con el dato del perfil. Si hay dudas, se
+  // marca en ámbar diciendo qué hay que elegir, que sigue ahorrando el
+  // trabajo de recordarlo sin arriesgarse a clicar lo que no es.
+  const personalizados = [
+    ...document.querySelectorAll(
+      '[role="combobox"], [aria-haspopup="listbox"], [role="listbox"]'
+    ),
+  ].filter((el) => {
+    if (el.closest("select")) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 || r.height > 0;
+  });
+
+  for (const el of personalizados) {
+    const desc = describir(el);
+    if (PROHIBIDOS.test(desc) || PREGUNTA_ABIERTA.test(desc)) continue;
+
+    let valor = "";
+    for (const [patron, v] of REGLAS)
+      if (v && patron.test(desc)) {
+        valor = v;
+        break;
+      }
+    if (!valor) continue;
+
+    const actual = (el.innerText || el.textContent || "").trim().toLowerCase();
+    if (actual.includes(valor.toLowerCase())) {
+      resaltar(el, "#34d399", "Ya estaba en el valor correcto.");
+      continue;
+    }
+
+    // Se abre la lista y se busca una opción con ese texto exacto.
+    let elegida = false;
+    try {
+      el.click();
+      await new Promise((r) => setTimeout(r, 350));
+      const opciones = [...document.querySelectorAll('[role="option"]')].filter((o) => {
+        const r = o.getBoundingClientRect();
+        return r.width > 0 || r.height > 0;
+      });
+      const buscada = valor.toLowerCase().trim();
+      const opcion = opciones.find(
+        (o) => (o.innerText || o.textContent || "").trim().toLowerCase() === buscada
+      );
+      if (opcion) {
+        opcion.click();
+        await new Promise((r) => setTimeout(r, 200));
+        elegida = true;
+      } else if (opciones.length) {
+        // La lista se abrió pero ninguna opción encaja exactamente. Se cierra
+        // sin tocar nada: elegir "la que más se parece" es justo lo que no
+        // debe hacer un autorrelleno.
+        el.click();
+      }
+    } catch {
+      // Un componente que no responde al clic no es un error: se marca y ya.
+    }
+
+    if (elegida) {
+      resaltar(el, "#fbbf24", `Elegido "${valor}". Compruébalo antes de enviar.`);
+      escritos++;
+    } else {
+      resaltar(el, "#fbbf24", `Elige "${valor}" aquí: no pude hacerlo por ti.`);
+      pendientes++;
+    }
+  }
+
   return {
     escritos,
     pendientes,
-    total: campos.length,
+    total: campos.length + personalizados.length,
     // Las etiquetas de lo que quedó sin rellenar, para poder avisar de que
     // hay preguntas de filtro esperando respuesta.
     sinDato: marcados.filter((m) => m.tipo === "sinDato").map((m) => m.etiqueta).slice(0, 8),

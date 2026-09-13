@@ -40,7 +40,7 @@ function montar(html: string) {
   } as never;
   const w = dom.window as unknown as { eval: (s: string) => void };
   w.eval(FUENTE);
-  return w as never as { rellenarFormulario: (f: unknown) => { escritos: number } };
+  return w as never as { rellenarFormulario: (f: unknown) => Promise<{ escritos: number }> };
 }
 
 const val = (sel: string) =>
@@ -48,7 +48,7 @@ const val = (sel: string) =>
 const nota = (sel: string) =>
   (dom.window.document.querySelector(sel) as HTMLElement | null)?.title ?? "";
 
-test("el estructurado de REGLAS es correcto: regex y cadena, nunca anidados", () => {
+test("el estructurado de REGLAS es correcto: regex y cadena, nunca anidados", async () => {
   // Un array anidado por un mal reemplazo seguía siendo JavaScript válido y
   // habría escrito basura en los campos. Se comprueba la forma, no solo que
   // el fichero cargue.
@@ -62,66 +62,66 @@ test("el estructurado de REGLAS es correcto: regex y cadena, nunca anidados", ()
   }
 });
 
-test("corrige el país preseleccionado por el portal", () => {
+test("corrige el país preseleccionado por el portal", async () => {
   // Medido en HireSkys: el país venía en "Pakistan" y la ciudad en "Maracay".
   const w = montar(`<form>
     <label for="c">Country</label>
     <select id="c"><option value="pk">Pakistan</option><option value="ve">Venezuela</option></select>
   </form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.equal(val("#c"), "ve", "enviar Pakistán con ciudad Maracay es peor que no tocar nada");
   assert.match(nota("#c"), /se cambió/i, "un cambio así tiene que avisarse");
 });
 
-test("no pisa una selección con una coincidencia solo aproximada", () => {
+test("no pisa una selección con una coincidencia solo aproximada", async () => {
   const w = montar(`<form>
     <label for="c">País</label>
     <select id="c"><option value="a">Argentina</option><option value="b">Venezuela (Bolivariana)</option></select>
   </form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.equal(val("#c"), "a", "sin coincidencia exacta se deja lo que había");
   assert.match(nota("#c"), /puede venir puesta por el portal/i);
 });
 
-test("con la opción vacía delante sí vale una coincidencia aproximada", () => {
+test("con la opción vacía delante sí vale una coincidencia aproximada", async () => {
   const w = montar(`<form>
     <label for="c">País</label>
     <select id="c"><option value="">Elige…</option><option value="b">Venezuela (Bolivariana)</option></select>
   </form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.equal(val("#c"), "b");
 });
 
-test("rellena el código postal", () => {
+test("rellena el código postal", async () => {
   const w = montar(`<form><label for="z">Post Code</label><input id="z"></form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.equal(val("#z"), "2101");
 });
 
-test("el patrón del código postal no coincide dentro de otras palabras", () => {
+test("el patrón del código postal no coincide dentro de otras palabras", async () => {
   const w = montar(`<form><label for="o">Ocupación actual</label><input id="o"></form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.notEqual(val("#o"), "2101", '"cp" dentro de "ocupación" no es un código postal');
 });
 
-test("rellena la fecha de nacimiento en el formato que espera un input date", () => {
+test("rellena la fecha de nacimiento en el formato que espera un input date", async () => {
   const w = montar(`<form><label for="b">Birth date</label><input id="b" type="date"></form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.equal(val("#b"), "1990-05-14");
 });
 
-test("el patrón de la fecha no coincide dentro de otras palabras", () => {
+test("el patrón de la fecha no coincide dentro de otras palabras", async () => {
   const w = montar(`<form><label for="d">Turno doble disponible</label><input id="d"></form>`);
-  w.rellenarFormulario(FICHA);
+  await w.rellenarFormulario(FICHA);
   assert.notEqual(val("#d"), "1990-05-14", '"dob" dentro de "doble" no es una fecha de nacimiento');
 });
 
-test("sin esos datos en el perfil, los campos quedan en ámbar y vacíos", () => {
+test("sin esos datos en el perfil, los campos quedan en ámbar y vacíos", async () => {
   const w = montar(`<form>
     <label for="z">Post Code</label><input id="z">
     <label for="b">Birth date</label><input id="b" type="date">
   </form>`);
-  w.rellenarFormulario({ ...FICHA, codigoPostal: "", fechaNacimiento: "" });
+  await w.rellenarFormulario({ ...FICHA, codigoPostal: "", fechaNacimiento: "" });
   assert.equal(val("#z"), "");
   assert.equal(val("#b"), "");
 });

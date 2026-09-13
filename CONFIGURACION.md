@@ -156,6 +156,9 @@ Lo que no hace, por diseño:
 - **No toca** contraseñas, documentos de identidad, tarjetas ni la subida de
   archivos: el CV que se adjunta lo eliges tú.
 - **No sobrescribe** lo que ya hayas escrito.
+- **Con los desplegables propios** (los que no son un `<select>` sino un
+  componente del portal) abre la lista y elige, pero solo si el texto coincide
+  exactamente con tu dato. Si no, los marca en ámbar diciendo qué elegir.
 - **No inventa.** Si el portal pregunta "¿cuántos años con [herramienta]?" y eso
   no está en tu perfil, lo deja en ámbar. Esa la contestas tú, porque queda por
   escrito y la va a leer un reclutador.
