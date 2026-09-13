@@ -226,10 +226,21 @@ document.getElementById("rellenar").addEventListener("click", async () => {
     }
     const dias = Math.floor((Date.now() - (fichaFecha || 0)) / 864e5);
     const aviso =
-      dias > 30 ? ` Tus datos se sincronizaron hace ${dias} días: si cambiaste el perfil, vuelve a sincronizar.` : "";
+      dias > 30
+        ? ` Tus datos se sincronizaron hace ${dias} días: si cambiaste el perfil, vuelve a sincronizar.`
+        : "";
+    // Se nombra lo que quedó sin rellenar. Sin esto, un campo en ámbar no
+    // distingue "no lo sé" de "no encontré su etiqueta", y no hay forma de
+    // saber si falta un dato del perfil o si hay que afinar un patrón.
+    const sinDato = (result.sinDato || [])
+      .map((t) => t.replace(/\s+/g, " ").trim().slice(0, 42))
+      .filter(Boolean);
+    const detalle = sinDato.length
+      ? ` Sin rellenar: ${sinDato.join("; ")}.`
+      : "";
     decir(
       `${result.escritos} campos rellenos, ${result.pendientes} en ámbar para que los contestes tú. ` +
-        `Revisa TODO antes de enviar: el envío es tuyo.${aviso}`,
+        `Revisa TODO antes de enviar: el envío es tuyo.${detalle}${aviso}`,
       result.escritos ? "ok" : "info"
     );
   } catch (e) {

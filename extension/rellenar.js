@@ -17,21 +17,78 @@ function rellenarFormulario(ficha) {
 
   const marcados = [];
 
-  /** Texto que describe un campo: su etiqueta, nombre, placeholder, aria. */
+  /**
+   * Texto que describe un campo: su etiqueta, nombre, placeholder y aria.
+   *
+   * Encontrar la etiqueta es la mitad del trabajo. Medido en Adzuna: los campos
+   * con `label for=` se rellenaron y las "preguntas adicionales del empleador"
+   * no, aunque había patrones para ellas. Esas preguntas son frases largas con
+   * formato dentro, colgadas de otro contenedor, y la versión anterior solo
+   * miraba el hermano previo DEL PADRE y encima exigía que no tuviera hijos.
+   *
+   * Ahora se prueban seis vías, de la más fiable a la más aproximada, y se
+   * acota el texto: un contenedor demasiado grande arrastraría las etiquetas de
+   * los campos vecinos y provocaría coincidencias cruzadas.
+   */
   function describir(el) {
+    const texto = (n) => (n ? (n.innerText || n.textContent || "").trim() : "");
+    const util = (t) => t && t.length >= 2 && t.length <= 300;
     const partes = [];
+
+    // 1. La etiqueta asociada por `for`.
     if (el.id) {
       const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (l) partes.push(l.innerText);
+      if (l) partes.push(texto(l));
     }
-    const contenedor = el.closest("label");
-    if (contenedor) partes.push(contenedor.innerText);
-    // Algunos portales ponen la etiqueta como hermano previo sin `for`.
-    const previo = el.parentElement?.previousElementSibling;
-    if (previo && previo.children.length === 0) partes.push(previo.innerText || "");
+
+    // 2. Una etiqueta que envuelve al campo.
+    const envolvente = el.closest("label");
+    if (envolvente) partes.push(texto(envolvente));
+
+    // 3. aria-labelledby, que apunta a otro elemento por id.
+    for (const id of (el.getAttribute("aria-labelledby") || "").split(/\s+/))
+      if (id) partes.push(texto(document.getElementById(id)));
+
+    // 4. Hermanos previos del propio campo. Aquí es donde vive la etiqueta en
+    //    la mayoría de formularios sin `for`.
+    let hermano = el.previousElementSibling;
+    for (let i = 0; hermano && i < 3; i++) {
+      const t = texto(hermano);
+      if (util(t)) {
+        partes.push(t);
+        break;
+      }
+      hermano = hermano.previousElementSibling;
+    }
+
+    // 5. Subiendo por los contenedores: el primero cuyo texto tenga tamaño de
+    //    etiqueta, o el hermano previo de ese contenedor.
+    let padre = el.parentElement;
+    for (let i = 0; padre && i < 4; i++) {
+      const propio = texto(padre);
+      if (util(propio)) {
+        partes.push(propio);
+        break;
+      }
+      const anterior = texto(padre.previousElementSibling);
+      if (util(anterior)) {
+        partes.push(anterior);
+        break;
+      }
+      padre = padre.parentElement;
+    }
+
+    // 6. Los atributos del propio campo.
     partes.push(el.name || "", el.id || "", el.placeholder || "");
-    partes.push(el.getAttribute("aria-label") || "", el.getAttribute("autocomplete") || "");
-    return partes.join(" ").toLowerCase().replace(/\s+/g, " ").slice(0, 300);
+    partes.push(el.getAttribute("aria-label") || "", el.getAttribute("title") || "");
+    partes.push(el.getAttribute("autocomplete") || "");
+
+    return partes
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .slice(0, 400);
   }
 
   /**
@@ -58,6 +115,17 @@ function rellenarFormulario(ficha) {
     el.style.outlineOffset = "1px";
     if (nota) el.title = nota;
   }
+
+  /**
+   * Preguntas abiertas del empleador: experiencia, motivación, resultados.
+   * Ninguna se contesta con un dato de la ficha, y buscar palabras sueltas
+   * dentro de ellas sale caro. Medido en Adzuna: la pregunta "What hands-on
+   * experience do you have with GoHighLevel (CRM setup, workflows, EMAIL
+   * automation...)" se rellenó con la dirección de correo, porque la palabra
+   * "email" aparecía de pasada. Enviar eso es peor que dejarlo en blanco.
+   */
+  const PREGUNTA_ABIERTA =
+    /experiencia|experience|descr[ií]b|explica|explain|cu[ée]ntanos|tell us|how (do|would|many) you|por qu[ée]|why do|qu[ée] resultados|what (specific )?results|motivaci[óo]n|motivation|logros|achievements|c[óo]mo (has|hiciste|manejas)/i;
 
   // Orden importante: los patrones más específicos van primero, porque
   // "nombre de la empresa" no debe capturarlo la regla de "nombre".
@@ -130,10 +198,14 @@ function rellenarFormulario(ficha) {
     if (!porDefecto && (el.value ?? "").trim()) continue;
 
     let valor = "";
-    for (const [patron, v] of REGLAS) {
-      if (v && patron.test(desc)) {
-        valor = v;
-        break;
+    // Una pregunta abierta no se contesta con un dato de la ficha, y buscarle
+    // palabras sueltas dentro provoca respuestas absurdas.
+    if (!PREGUNTA_ABIERTA.test(desc)) {
+      for (const [patron, v] of REGLAS) {
+        if (v && patron.test(desc)) {
+          valor = v;
+          break;
+        }
       }
     }
 
@@ -175,7 +247,13 @@ function rellenarFormulario(ficha) {
       resaltar(el, "#34d399");
       escritos++;
     } else {
-      resaltar(el, "#fbbf24", "Esto no está en tu perfil: contéstalo tú.");
+      resaltar(
+        el,
+        "#fbbf24",
+        PREGUNTA_ABIERTA.test(desc)
+          ? "Pregunta abierta: esto lo contestas tú, con tu criterio."
+          : "Esto no está en tu perfil: contéstalo tú."
+      );
       marcados.push({ tipo: "sinDato", etiqueta: desc.slice(0, 60) });
       pendientes++;
     }
