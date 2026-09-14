@@ -146,26 +146,28 @@ function leerFicha() {
   const p = estado?.perfil;
   if (!p?.nombre) return { error: "No hay perfil cargado en esta app." };
 
-  const partes = p.nombre.trim().split(/\s+/);
+  const nombres = p.nombre.trim().split(/\s+/);
   const enlace = (patron) =>
     (p.links || []).find((l) => patron.test(l.etiqueta || "") || patron.test(l.url || ""))?.url || "";
+
   // "Maracay, Aragua, Venezuela" son ciudad, estado y país, en ese orden.
   // Antes se tomaba el primero como ciudad y TODO lo demás como país, así que
   // el país acababa siendo "Aragua, Venezuela" y ningún desplegable tenía una
   // opción con ese texto: por eso el país se quedaba como lo dejara el portal.
-  const partes = (p.ubicacion || "")
+  const lugar = (p.ubicacion || "")
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
-  const ciudad = partes[0] ?? "";
-  const pais = partes.length > 1 ? partes[partes.length - 1] : "";
-  const provincia = partes.length > 2 ? partes.slice(1, -1).join(", ") : "";
+  const ciudad = lugar[0] ?? "";
+  const pais = lugar.length > 1 ? lugar[lugar.length - 1] : "";
+  const provincia = lugar.length > 2 ? lugar.slice(1, -1).join(", ") : "";
 
   return {
     ficha: {
       nombre: p.nombre,
-      nombrePila: partes.slice(0, partes.length > 2 ? 2 : 1).join(" "),
-      apellidos: partes.length > 2 ? partes.slice(2).join(" ") : partes.slice(1).join(" "),
+      nombrePila: nombres.slice(0, nombres.length > 2 ? 2 : 1).join(" "),
+      apellidos:
+        nombres.length > 2 ? nombres.slice(2).join(" ") : nombres.slice(1).join(" "),
       email: p.email || "",
       telefono: p.telefono || "",
       ciudad,

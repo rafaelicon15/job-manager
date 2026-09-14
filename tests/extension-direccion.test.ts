@@ -113,37 +113,73 @@ test("sin provincia en el perfil, el campo queda vacío", async () => {
   assert.equal(val("#e"), "");
 });
 
-test("el país es el último tramo de la ubicación, no todo lo que sigue a la ciudad", () => {
-  // Esta es la partición que hace el popup al leer el perfil. Se comprueba
-  // aquí porque es la causa de que el desplegable de país no encontrara
-  // ninguna opción: buscaba "Aragua, Venezuela".
-  const partir = (ubicacion: string) => {
-    const partes = ubicacion.split(",").map((x) => x.trim()).filter(Boolean);
-    return {
-      ciudad: partes[0] ?? "",
-      pais: partes.length > 1 ? partes[partes.length - 1] : "",
-      provincia: partes.length > 2 ? partes.slice(1, -1).join(", ") : "",
-    };
-  };
+/**
+ * Ejecuta el `leerFicha` DE VERDAD, sacándolo de popup.js.
+ *
+ * Antes esto se comprobaba buscando nombres de variable en el fichero, que es
+ * una prueba que se rompe al renombrar algo y no comprueba nada. El popup no se
+ * puede cargar entero fuera del navegador porque toca `document` y `chrome` en
+ * cuanto arranca, así que se extrae solo esta función.
+ */
+function leerFichaDelPopup(perfil: Record<string, unknown>) {
+  const popup = readFileSync(new URL("../extension/popup.js", import.meta.url), "utf8");
+  const i = popup.indexOf("function leerFicha()");
+  assert.ok(i !== -1, "no se encontró leerFicha en popup.js");
+  const fin = popup.indexOf("\n}", i);
+  const fuente = popup.slice(i, fin + 2);
 
-  assert.deepEqual(partir("Maracay, Aragua, Venezuela"), {
-    ciudad: "Maracay",
-    provincia: "Aragua",
-    pais: "Venezuela",
-  });
-  assert.deepEqual(partir("Valencia, España"), {
-    ciudad: "Valencia",
-    provincia: "",
-    pais: "España",
-  });
-  assert.deepEqual(partir("Madrid"), { ciudad: "Madrid", provincia: "", pais: "" });
-  assert.deepEqual(partir(""), { ciudad: "", provincia: "", pais: "" });
+  // jsdom solo da localStorage a una página con origen: sin `url` lanza un
+  // error de seguridad, igual que un navegador en about:blank.
+  const ventana = new JSDOM("", {
+    url: "https://ejemplo.test/",
+    runScripts: "outside-only",
+  }).window as unknown as {
+    eval: (s: string) => unknown;
+    localStorage: Storage;
+  };
+  ventana.localStorage.setItem("rjm:estado:v1", JSON.stringify({ perfil }));
+  ventana.eval(fuente);
+  return (ventana as unknown as { leerFicha: () => { ficha?: Record<string, string> } })
+    .leerFicha().ficha;
+}
+
+test("el país es el último tramo de la ubicación, no todo lo que sigue a la ciudad", () => {
+  // Esta era la causa de que el desplegable de país no encontrara ninguna
+  // opción: buscaba una que dijera "Aragua, Venezuela".
+  const f = leerFichaDelPopup({ nombre: "Ana Torres", ubicacion: "Maracay, Aragua, Venezuela" });
+  assert.equal(f?.ciudad, "Maracay");
+  assert.equal(f?.provincia, "Aragua");
+  assert.equal(f?.pais, "Venezuela");
 });
 
-test("el popup parte la ubicación igual que esta prueba", () => {
-  // Si el popup cambia esa partición y la prueba no se entera, el fallo vuelve
-  // en silencio. Se comprueba que el código sigue estando.
-  const popup = readFileSync(new URL("../extension/popup.js", import.meta.url), "utf8");
-  assert.match(popup, /partes\[partes\.length - 1\]/, "el país tiene que ser el último tramo");
-  assert.match(popup, /partes\.slice\(1, -1\)/, "la provincia es lo de en medio");
+test("con dos tramos no se inventa una provincia", () => {
+  const f = leerFichaDelPopup({ nombre: "Ana Torres", ubicacion: "Valencia, España" });
+  assert.equal(f?.ciudad, "Valencia");
+  assert.equal(f?.provincia, "");
+  assert.equal(f?.pais, "España");
+});
+
+test("con un solo tramo no se inventa un país", () => {
+  const f = leerFichaDelPopup({ nombre: "Ana Torres", ubicacion: "Madrid" });
+  assert.equal(f?.ciudad, "Madrid");
+  assert.equal(f?.pais, "", "poner Madrid de país sería peor que dejarlo vacío");
+});
+
+test("sin ubicación no revienta", () => {
+  const f = leerFichaDelPopup({ nombre: "Ana Torres" });
+  assert.equal(f?.ciudad, "");
+  assert.equal(f?.pais, "");
+  assert.equal(f?.provincia, "");
+});
+
+test("el nombre se parte aparte de la ubicación", () => {
+  // Las dos particiones convivían con la misma variable y eso rompió el
+  // fichero entero. Se comprueba que siguen dando resultados distintos.
+  const f = leerFichaDelPopup({
+    nombre: "Ana María Torres Gil",
+    ubicacion: "Maracay, Aragua, Venezuela",
+  });
+  assert.equal(f?.nombrePila, "Ana María");
+  assert.equal(f?.apellidos, "Torres Gil");
+  assert.equal(f?.ciudad, "Maracay");
 });
