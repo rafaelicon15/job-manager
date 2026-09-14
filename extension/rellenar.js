@@ -176,7 +176,16 @@ async function rellenarFormulario(ficha) {
     [/fecha de nacimiento|birth ?date|date of birth|\bdob\b|cumplea[ñn]os|nacimiento/, ficha.fechaNacimiento],
     [/ciudad|localidad|city/, ficha.ciudad],
     [/pa[íi]s|country/, ficha.pais],
-    [/direcci[óo]n|address/, ficha.ciudad],
+    // "estado" a secas también aparece en "estado civil", que no es esto.
+    [
+      /^(?!.*civil)(?!.*marital).*(\bestado\b|provincia|\bstate\b|\bregi[óo]n\b|departamento|\bprovince\b)/,
+      ficha.provincia,
+    ],
+    // NO existe una regla para "dirección" o "address": el perfil no guarda la
+    // calle, y la que había rellenaba esos campos con la CIUDAD. Medido en un
+    // formulario real: el campo "Street" acabó diciendo "Maracay". Un dato en
+    // el campo equivocado es peor que un campo vacío, porque se envía sin que
+    // nadie lo mire.
     [/nombre completo|full ?name|nombre y apellido/, ficha.nombre],
     [/apellidos?|last ?name|surname/, ficha.apellidos],
     [/^(?!.*empresa)(?!.*compa[ñn])(?!.*usuario).*(nombres?|first ?name|given)/, ficha.nombrePila],

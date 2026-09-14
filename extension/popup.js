@@ -149,7 +149,17 @@ function leerFicha() {
   const partes = p.nombre.trim().split(/\s+/);
   const enlace = (patron) =>
     (p.links || []).find((l) => patron.test(l.etiqueta || "") || patron.test(l.url || ""))?.url || "";
-  const [ciudad, ...resto] = (p.ubicacion || "").split(",").map((x) => x.trim());
+  // "Maracay, Aragua, Venezuela" son ciudad, estado y país, en ese orden.
+  // Antes se tomaba el primero como ciudad y TODO lo demás como país, así que
+  // el país acababa siendo "Aragua, Venezuela" y ningún desplegable tenía una
+  // opción con ese texto: por eso el país se quedaba como lo dejara el portal.
+  const partes = (p.ubicacion || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const ciudad = partes[0] ?? "";
+  const pais = partes.length > 1 ? partes[partes.length - 1] : "";
+  const provincia = partes.length > 2 ? partes.slice(1, -1).join(", ") : "";
 
   return {
     ficha: {
@@ -158,8 +168,9 @@ function leerFicha() {
       apellidos: partes.length > 2 ? partes.slice(2).join(" ") : partes.slice(1).join(" "),
       email: p.email || "",
       telefono: p.telefono || "",
-      ciudad: ciudad || "",
-      pais: resto.join(", ") || "",
+      ciudad,
+      provincia,
+      pais,
       codigoPostal: p.codigoPostal || "",
       fechaNacimiento: p.fechaNacimiento || "",
       titular: p.titular || "",

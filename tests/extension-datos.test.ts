@@ -58,8 +58,29 @@ test("el estructurado de REGLAS es correcto: regex y cadena, nunca anidados", as
   const reglas = new Function("ficha", `return [${m![1]}]`)(ficha) as unknown[][];
   for (const [patron, valor] of reglas) {
     assert.ok(patron instanceof RegExp, `patrón no es una expresión regular: ${patron}`);
-    assert.equal(typeof valor, "string", `el valor no es texto: ${JSON.stringify(valor)}`);
+    // undefined es válido: una ficha sincronizada antes de que existiera un
+    // campo no lo trae, y el relleno lo salta sin más. Lo que no puede ser es
+    // un array o un objeto, que es lo que dejaba un reemplazo mal hecho.
+    assert.ok(
+      typeof valor === "string" || valor === undefined,
+      `el valor no es texto ni está ausente: ${JSON.stringify(valor)}`
+    );
   }
+});
+
+test("una ficha vieja sin los campos nuevos no rompe el relleno", async () => {
+  // Quien sincronizó antes de que existieran provincia o código postal tiene
+  // una ficha sin esas claves. Debe rellenar lo que sí tiene y dejar el resto.
+  const vieja = { nombre: "Ana Torres Gil", nombrePila: "Ana", email: "correo@ejemplo.com" };
+  const w = montar(`<form>
+    <label for="e">Correo</label><input id="e">
+    <label for="s">State</label><input id="s">
+    <label for="z">Zip</label><input id="z">
+  </form>`);
+  await w.rellenarFormulario(vieja);
+  assert.equal(val("#e"), "correo@ejemplo.com");
+  assert.equal(val("#s"), "");
+  assert.equal(val("#z"), "");
 });
 
 test("corrige el país preseleccionado por el portal", async () => {
