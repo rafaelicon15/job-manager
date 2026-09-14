@@ -125,3 +125,60 @@ test("sin esos datos en el perfil, los campos quedan en ámbar y vacíos", async
   assert.equal(val("#z"), "");
   assert.equal(val("#b"), "");
 });
+
+test("reconoce campos nombrados con guion bajo, como en un ATS", async () => {
+  // Medido en BKX Holdings: las etiquetas eran "First" y "Last" y los campos
+  // se llamaban first_name y last_name. El patrón buscaba "first name" con
+  // espacio, así que no coincidía con ninguno y quedaban los dos en ámbar.
+  const w = montar(`<form>
+    <label for="a">First</label><input id="a" name="first_name">
+    <label for="b">Last</label><input id="b" name="last_name">
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#a"), "Ana");
+  assert.equal(val("#b"), "Torres Gil");
+});
+
+test("reconoce campos nombrados en camelCase", async () => {
+  const w = montar(`<form>
+    <input name="firstName" aria-label="firstName">
+    <input name="postalCode" aria-label="postalCode">
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("[name=firstName]"), "Ana");
+  assert.equal(val("[name=postalCode]"), "2101");
+});
+
+test("los identificadores generados no provocan coincidencias por azar", async () => {
+  // "hxzorhfmlrbkt36hszhf" es un id de framework: no describe nada, y una
+  // cadena larga al azar acaba conteniendo "zip" o "dob" tarde o temprano.
+  const w = montar(`<form>
+    <input id="hxzodobrhfmlrbkt36hszhf">
+    <input id="qwzipfmlrbkt36hszhfxc">
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#hxzodobrhfmlrbkt36hszhf"), "", "un id generado no es una fecha de nacimiento");
+  assert.equal(val("#qwzipfmlrbkt36hszhfxc"), "", "un id generado no es un código postal");
+});
+
+test("un id legible sí se usa para reconocer el campo", async () => {
+  const w = montar(`<form><input id="postal_code"></form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#postal_code"), "2101");
+});
+
+test("los patrones cuentan con los separadores ya normalizados", async () => {
+  // Separar camelCase convierte "LinkedIn" en "Linked In" y "E-mail" en
+  // "E mail". Los patrones tienen que seguir reconociéndolos: al añadir la
+  // normalización se rompieron estos tres sin que nadie lo notara hasta que
+  // falló una prueba de LinkedIn.
+  const w = montar(`<form>
+    <label for="l">LinkedIn</label><input id="l">
+    <label for="e">E-mail</label><input id="e">
+    <label for="c">C.P.</label><input id="c">
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#l"), "https://linkedin.com/in/x");
+  assert.equal(val("#e"), "correo@ejemplo.com");
+  assert.equal(val("#c"), "2101");
+});

@@ -82,10 +82,20 @@ async function rellenarFormulario(ficha) {
       return "";
     }
 
-    // Los atributos del propio campo sí se suman siempre: son suyos y no
-    // pueden venir de un campo vecino.
+    /**
+     * Descarta los identificadores generados por el framework, del tipo
+     * "hxzorhfmlrbkt36hszhf". No describen nada, y una cadena larga al azar
+     * acaba conteniendo "zip", "dob" o "cp" antes o después, provocando
+     * coincidencias que no significan nada. Se reconocen por ser largas, sin
+     * separadores, con dígitos y con una tirada larga de letras.
+     */
+    const legible = (t) =>
+      Boolean(t) &&
+      !(t.length >= 10 && !/[_\-\s.]/.test(t) && /\d/.test(t) && /[a-z]{6,}/i.test(t));
+
     return [
       etiqueta(),
+      // Los atributos del propio campo son suyos: no pueden venir de un vecino.
       el.name || "",
       el.id || "",
       el.placeholder || "",
@@ -93,10 +103,19 @@ async function rellenarFormulario(ficha) {
       el.getAttribute("title") || "",
       el.getAttribute("autocomplete") || "",
     ]
-      .filter(Boolean)
+      .filter(legible)
       .join(" ")
+      // "firstName", "first_name" y "first-name" son lo mismo que "first
+      // name". Sin separar esto, un formulario que nombra sus campos con
+      // guion bajo no coincidía con ningún patrón: medido en BKX Holdings,
+      // donde "first_name" y "last_name" se quedaron sin rellenar aunque
+      // había reglas para los dos. El corte de camelCase va antes de pasar a
+      // minúsculas, que es cuando todavía se distingue.
+      .replace(/([a-zà-ÿ])([A-ZÀ-Ý])/g, "$1 $2")
+      .replace(/[_\-./]+/g, " ")
       .toLowerCase()
       .replace(/\s+/g, " ")
+      .trim()
       .slice(0, 400);
   }
 
@@ -139,9 +158,12 @@ async function rellenarFormulario(ficha) {
   // Orden importante: los patrones más específicos van primero, porque
   // "nombre de la empresa" no debe capturarlo la regla de "nombre".
   const REGLAS = [
-    [/correo|e-?mail/, ficha.email],
+    // Los separadores llegan aquí ya convertidos en espacios, así que los
+    // patrones tienen que contar con ellos: "E-mail" se ve como "e mail" y
+    // "LinkedIn" como "linked in", porque el corte de camelCase los separa.
+    [/correo|e ?-?mail/, ficha.email],
     [/tel[ée]fono|celular|m[óo]vil|whatsapp|phone|movil/, ficha.telefono],
-    [/linked-?in/, ficha.linkedin],
+    [/linked ?-?in/, ficha.linkedin],
     [/portafolio|portfolio|sitio web|p[áa]gina web|website|url personal/, ficha.web],
     [
       /pretensi[óo]n|expectativa salarial|salario (deseado|pretendido|esperado)|remuneraci[óo]n (deseada|esperada)|aspiraci[óo]n salarial|expected salary/,
@@ -150,7 +172,7 @@ async function rellenarFormulario(ficha) {
     [/disponibilidad|incorporaci[óo]n|fecha de inicio|availability|notice period/, ficha.disponibilidad],
     // Los límites de palabra importan: "cp" suelto coincidiría dentro de
     // "ocupación", y "dob" dentro de "doble".
-    [/c[óo]digo postal|post ?code|postal code|zip ?code|\bc\.?p\.?\b|\bzip\b/, ficha.codigoPostal],
+    [/c[óo]digo postal|post ?code|postal code|zip ?code|\bc ?p\b|\bzip\b/, ficha.codigoPostal],
     [/fecha de nacimiento|birth ?date|date of birth|\bdob\b|cumplea[ñn]os|nacimiento/, ficha.fechaNacimiento],
     [/ciudad|localidad|city/, ficha.ciudad],
     [/pa[íi]s|country/, ficha.pais],
