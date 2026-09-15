@@ -10,6 +10,7 @@ import {
   Mail,
   Mic,
   MessagesSquare,
+  CalendarClock,
   NotebookPen,
   Paperclip,
   Star,
@@ -24,6 +25,7 @@ import PanelCV from "@/components/PanelCV";
 import PanelCarta from "@/components/PanelCarta";
 import PanelRespuestas from "@/components/PanelRespuestas";
 import PanelEntrevista from "@/components/PanelEntrevista";
+import PanelReuniones from "@/components/PanelReuniones";
 import Adjuntos from "@/components/Adjuntos";
 import { nuevoId } from "@/lib/store";
 
@@ -33,6 +35,7 @@ type Pestana =
   | "carta"
   | "respuestas"
   | "entrevista"
+  | "reuniones"
   | "material"
   | "oferta"
   | "notas";
@@ -43,6 +46,7 @@ const PESTANAS: { id: Pestana; label: string; Icono: typeof Target }[] = [
   { id: "carta", label: "Carta y mensaje", Icono: Mail },
   { id: "respuestas", label: "Respuestas", Icono: MessagesSquare },
   { id: "entrevista", label: "Entrevista", Icono: Mic },
+  { id: "reuniones", label: "Reuniones", Icono: CalendarClock },
   { id: "material", label: "Material", Icono: Paperclip },
   { id: "oferta", label: "La oferta", Icono: ExternalLink },
   { id: "notas", label: "Notas", Icono: NotebookPen },
@@ -155,7 +159,7 @@ export default function FichaVacante({
                 onClick={() => {
                   if (
                     confirm(
-                      `¿Eliminar "${vacante.titulo}"? Se borran su análisis y sus ${vacante.documentos.length} documentos. No se puede deshacer.`
+                      `¿Eliminar "${vacante.titulo}"? Se borran su análisis, sus ${vacante.documentos.length} documentos y los resúmenes de sus ${(vacante.reuniones ?? []).length} reuniones. No se puede deshacer.`
                     )
                   ) {
                     borrarVacante(vacante.id);
@@ -248,6 +252,7 @@ export default function FichaVacante({
       {pestana === "carta" && <PanelCarta vacante={vacante} />}
       {pestana === "respuestas" && <PanelRespuestas vacante={vacante} />}
       {pestana === "entrevista" && <PanelEntrevista vacante={vacante} />}
+      {pestana === "reuniones" && <PanelReuniones vacante={vacante} />}
 
       {pestana === "material" && (
         <Adjuntos

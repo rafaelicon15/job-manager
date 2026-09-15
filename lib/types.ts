@@ -195,6 +195,8 @@ export interface Vacante {
   contacto?: { nombre?: string; cargo?: string; linkedin?: string; email?: string };
   analisis?: Analisis;
   documentos: DocumentoGenerado[];
+  /** Las llamadas y entrevistas que ya han pasado, con su resumen. */
+  reuniones: Reunion[];
   /** Material que manda el reclutador, ya analizado. */
   adjuntos: Adjunto[];
   notas: { id: string; texto: string; fecha: string }[];
@@ -262,6 +264,84 @@ export interface Conversacion {
   adjuntos: Adjunto[];
   creadaEn: string;
   actualizadaEn: string;
+}
+
+export type TipoReunion =
+  | "screening"
+  | "tecnica"
+  | "con_manager"
+  | "cultural"
+  | "final"
+  | "seguimiento"
+  | "otra";
+
+export const TIPOS_REUNION: { id: TipoReunion; label: string }[] = [
+  { id: "screening", label: "Screening con RRHH" },
+  { id: "tecnica", label: "Entrevista técnica" },
+  { id: "con_manager", label: "Con el responsable" },
+  { id: "cultural", label: "Encaje cultural" },
+  { id: "final", label: "Ronda final" },
+  { id: "seguimiento", label: "Seguimiento" },
+  { id: "otra", label: "Otra" },
+];
+
+/**
+ * Una reunión que ya ocurrió: la llamada de screening, la técnica, la del
+ * responsable.
+ *
+ * Existe porque lo que se dice en una llamada no queda escrito en ningún
+ * sitio. A la tercera entrevista nadie recuerda qué sueldo mencionaron de
+ * pasada, qué prometiste mandar, ni qué te preguntaron y contestaste regular.
+ * Eso es justo lo que decide el proceso, y se pierde.
+ *
+ * `notasCrudas` es lo que pegas tú: apuntes a mano, la transcripción de Meet,
+ * el chat de la llamada. `resumen` es lo que saca el motor de ahí.
+ */
+export interface Reunion {
+  id: string;
+  tipo: TipoReunion;
+  /** Cuándo fue, en AAAA-MM-DDTHH:MM (lo que da un input datetime-local). */
+  fecha: string;
+  duracionMin?: number;
+  /** Zoom, Meet, Teams, teléfono, presencial. */
+  canal: string;
+  participantes: { nombre: string; cargo?: string }[];
+  /** Apuntes, transcripción o chat de la llamada, tal cual. */
+  notasCrudas: string;
+  resumen?: ResumenReunion;
+  creadaEn: string;
+  actualizadaEn: string;
+}
+
+export interface ResumenReunion {
+  titulo: string;
+  resumen: string;
+  puntosClave: string[];
+  /** Condiciones concretas que salieron en la llamada: sueldo, horario, plazos. */
+  datosDelPuesto: { concepto: string; valor: string }[];
+  /** Lo que te preguntaron y cómo lo contestaste, con una versión mejor. */
+  preguntasQueMeHicieron: {
+    pregunta: string;
+    comoRespondi: string;
+    mejorRespuesta: string;
+  }[];
+  /** Lo que prometiste tú. Esto es lo que más se olvida y lo que peor sienta. */
+  compromisosMios: string[];
+  /** Lo que prometieron ellos, con el plazo que dieron si lo dieron. */
+  compromisosDeEllos: string[];
+  /** Lo que preguntaste y no te contestaron, o quedó a medias. */
+  preguntasSinResponder: string[];
+  senalesBuenas: string[];
+  senalesDeAlerta: string[];
+  /** Cosas que dijiste y el perfil maestro no respalda. La misma red que en los hilos. */
+  incoherencias: Incoherencia[];
+  /** Qué preparar para la siguiente ronda. */
+  aReforzar: string[];
+  proximoPaso: string;
+  /** Mensaje de seguimiento listo para enviar. */
+  seguimiento: string;
+  generadoEn: string;
+  modelo: string;
 }
 
 /**

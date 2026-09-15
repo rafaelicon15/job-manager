@@ -9,6 +9,7 @@ import type {
   EstadoVacante,
   Mensaje,
   PerfilMaestro,
+  Reunion,
   Vacante,
 } from "./types";
 import { limpiarPendientes } from "./pendientes";
@@ -51,6 +52,7 @@ function hidratar(crudo: string | null): EstadoApp {
         documentos: v.documentos ?? [],
         notas: v.notas ?? [],
         adjuntos: v.adjuntos ?? [],
+        reuniones: v.reuniones ?? [],
       })),
       conversaciones: (guardado.conversaciones ?? []).map((c) => ({
         ...c,
@@ -114,7 +116,7 @@ export function useEstado() {
   }, []);
 
   const agregarVacante = useCallback(
-    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "adjuntos" | "favorito" | "estado"> &
+    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "adjuntos" | "reuniones" | "favorito" | "estado"> &
       Partial<Pick<Vacante, "estado" | "favorito">>) => {
       const ahora = new Date().toISOString();
       const vacante: Vacante = {
@@ -126,6 +128,7 @@ export function useEstado() {
         documentos: [],
         notas: [],
         adjuntos: [],
+        reuniones: [],
         ...v,
       } as Vacante;
       setEstado((s) => ({ ...s, vacantes: [vacante, ...s.vacantes] }));
@@ -206,6 +209,66 @@ export function useEstado() {
       vacantes: s.vacantes.map((v) =>
         v.id === idVacante
           ? { ...v, documentos: v.documentos.filter((d) => d.id !== idDoc) }
+          : v
+      ),
+    }));
+  }, []);
+
+  // ------------------------------------------------------------ reuniones
+
+  const agregarReunion = useCallback(
+    (
+      idVacante: string,
+      r: Omit<Reunion, "id" | "creadaEn" | "actualizadaEn">
+    ) => {
+      const ahora = new Date().toISOString();
+      const reunion: Reunion = { ...r, id: nuevoId("reu"), creadaEn: ahora, actualizadaEn: ahora };
+      setEstado((s) => ({
+        ...s,
+        vacantes: s.vacantes.map((v) =>
+          v.id === idVacante
+            ? {
+                ...v,
+                // Las más recientes primero: en un proceso de cuatro rondas lo
+                // que interesa al abrir es la última, no la de hace un mes.
+                reuniones: [reunion, ...(v.reuniones ?? [])],
+                actualizadaEn: ahora,
+              }
+            : v
+        ),
+      }));
+      return reunion;
+    },
+    []
+  );
+
+  const actualizarReunion = useCallback(
+    (idVacante: string, idReunion: string, parcial: Partial<Reunion>) => {
+      setEstado((s) => ({
+        ...s,
+        vacantes: s.vacantes.map((v) =>
+          v.id === idVacante
+            ? {
+                ...v,
+                reuniones: (v.reuniones ?? []).map((r) =>
+                  r.id === idReunion
+                    ? { ...r, ...parcial, actualizadaEn: new Date().toISOString() }
+                    : r
+                ),
+              }
+            : v
+        ),
+      }));
+    },
+    []
+  );
+
+  const borrarReunion = useCallback((idVacante: string, idReunion: string) => {
+    setEstado((s) => ({
+      ...s,
+      vacantes: s.vacantes.map((v) =>
+        v.id === idVacante
+          ? { ...v, reuniones: (v.reuniones ?? []).filter((r) => r.id !== idReunion) }
           : v
       ),
     }));
@@ -350,6 +413,9 @@ export function useEstado() {
     cambiarEstadoVacante,
     agregarDocumento,
     borrarDocumento,
+    agregarReunion,
+    actualizarReunion,
+    borrarReunion,
     agregarConversacion,
     actualizarConversacion,
     borrarConversacion,

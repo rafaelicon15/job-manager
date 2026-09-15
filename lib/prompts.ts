@@ -3,8 +3,10 @@ import type {
   Analisis,
   Idioma,
   PerfilMaestro,
+  Reunion,
   Vacante,
 } from "./types";
+import { TIPOS_REUNION } from "./types";
 
 /**
  * Serializa el perfil maestro a un bloque compacto que el modelo pueda citar.
@@ -521,6 +523,8 @@ ${v.analisis ? `\nANÁLISIS PREVIO
   Brechas: ${v.analisis.brechas.map((b) => `${b.brecha} → ${b.mitigacion}`).join(" | ")}
   Banderas rojas de la oferta: ${v.analisis.banderasRojas.join(" | ") || "ninguna"}` : ""}
 
+${historialReuniones(v.reuniones)}
+
 Prepara la entrevista en ${lang}. Devuelve el JSON pedido:
 
 - estrategia: en 3-4 frases, el hilo conductor que debe mantener durante toda la conversación. Qué es lo único que quiere que recuerden de él al colgar.
@@ -542,6 +546,144 @@ Prepara la entrevista en ${lang}. Devuelve el JSON pedido:
 - avisos: cualquier cosa que deba decidir o confirmar ANTES de la llamada, incluido cualquier dato que falte en su perfil y que le vayan a preguntar.
 
 Nunca le pongas en la boca una experiencia, herramienta, cifra o titulación que el perfil no respalde. Si un requisito no lo cumple, la respuesta debe reconocerlo y reencuadrarlo, no esquivarlo.`;
+}
+
+/**
+ * Resume las reuniones que ya han pasado, para que el resto de los prompts no
+ * repitan lo ya hablado.
+ *
+ * Es lo que distingue una segunda entrevista de una primera repetida. Si en la
+ * llamada de screening ya dijo que su disponibilidad es inmediata y que le
+ * mencionaron un rango, preparar la técnica sin eso delante produce un guion
+ * que vuelve a empezar de cero.
+ *
+ * Solo entran las reuniones ya resumidas: las notas crudas de cuatro llamadas
+ * se comen el contexto sin aportar más que su resumen.
+ */
+export function historialReuniones(reuniones: Reunion[] = []): string {
+  const conResumen = reuniones.filter((r) => r.resumen);
+  if (!conResumen.length) return "";
+
+  // En orden cronológico, aunque en la pantalla se vean del revés: el modelo
+  // tiene que ver cómo ha evolucionado el proceso.
+  const orden = [...conResumen].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const etiqueta = (r: Reunion) =>
+    TIPOS_REUNION.find((t) => t.id === r.tipo)?.label ?? "Reunión";
+
+  const bloques = orden.map((r) => {
+    const x = r.resumen!;
+    const partes = [
+      `  [${r.fecha || "sin fecha"}] ${etiqueta(r)}${r.canal ? ` por ${r.canal}` : ""}`,
+      `  Con: ${r.participantes.map((q) => [q.nombre, q.cargo].filter(Boolean).join(", ")).join(" | ") || "sin registrar"}`,
+      `  ${x.resumen}`,
+    ];
+    if (x.datosDelPuesto.length)
+      partes.push(
+        `  Condiciones que salieron: ${x.datosDelPuesto.map((d) => `${d.concepto}: ${d.valor}`).join(" | ")}`
+      );
+    if (x.compromisosMios.length)
+      partes.push(`  Prometí yo: ${x.compromisosMios.join(" | ")}`);
+    if (x.compromisosDeEllos.length)
+      partes.push(`  Prometieron ellos: ${x.compromisosDeEllos.join(" | ")}`);
+    if (x.preguntasSinResponder.length)
+      partes.push(`  Sigue sin respuesta: ${x.preguntasSinResponder.join(" | ")}`);
+    if (x.senalesDeAlerta.length)
+      partes.push(`  Señales de alerta: ${x.senalesDeAlerta.join(" | ")}`);
+    if (x.aReforzar.length) partes.push(`  A reforzar: ${x.aReforzar.join(" | ")}`);
+    return partes.join("\n");
+  });
+
+  return `REUNIONES YA CELEBRADAS EN ESTE PROCESO (${orden.length})
+${bloques.join("\n\n")}
+
+No vuelvas a plantear lo que ya se resolvió en estas reuniones. Si algo quedó
+sin respuesta, eso sí hay que retomarlo.`;
+}
+
+/**
+ * Convierte los apuntes de una llamada en un resumen utilizable.
+ *
+ * El acento está en lo que se pierde al colgar: qué prometió cada parte, qué
+ * condiciones se mencionaron de pasada, qué pregunta contestó regular y qué
+ * dijo que su perfil no respalda. Un resumen bonito de la conversación no
+ * sirve de nada; saber que prometió mandar el portafolio el martes, sí.
+ */
+export function promptReunion(
+  p: PerfilMaestro,
+  v: Vacante,
+  r: Reunion,
+  idioma: Idioma
+): string {
+  const lang = idioma === "en" ? "inglés" : "español";
+  const etiqueta = TIPOS_REUNION.find((t) => t.id === r.tipo)?.label ?? "Reunión";
+  const gente =
+    r.participantes
+      .map((q) => [q.nombre, q.cargo].filter(Boolean).join(", "))
+      .filter(Boolean)
+      .join(" | ") || "no registrados";
+
+  return `Eres el jefe de gabinete de ${p.nombre}. Acaba de salir de una reunión de un proceso de selección y te pasa sus apuntes. Tu trabajo es que no se pierda nada de lo que va a importar dentro de tres semanas.
+
+${perfilComoTexto(p)}
+
+${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
+
+VACANTE
+  Puesto: ${v.titulo} — ${v.empresa}
+  Modalidad: ${v.modalidad} | Ubicación: ${v.ubicacion} | Salario publicado: ${v.salario || "no publicado"}
+  Su expectativa: ${p.preferencias.salarioObjetivo || "sin definir"} (mínimo ${p.preferencias.salarioMin || "sin definir"})
+${
+  v.analisis
+    ? `  Requisitos que NO cumple: ${v.analisis.requisitos.filter((q) => q.cubierto === "no").map((q) => q.requisito).join(" | ") || "ninguno"}`
+    : ""
+}
+
+${historialReuniones((v.reuniones ?? []).filter((x) => x.id !== r.id))}
+
+LA REUNIÓN QUE HAY QUE RESUMIR
+  Tipo: ${etiqueta}
+  Cuándo: ${r.fecha || "sin fecha"}${r.duracionMin ? ` (${r.duracionMin} min)` : ""}
+  Canal: ${r.canal || "sin registrar"}
+  Participantes: ${gente}
+
+  APUNTES, TRANSCRIPCIÓN O CHAT, TAL CUAL LOS PEGÓ:
+  """
+  ${r.notasCrudas.slice(0, 60000)}
+  """
+
+Devuelve el JSON pedido, en ${lang}:
+
+- titulo: cómo llamar a esta reunión en cinco palabras o menos.
+
+- resumen: 3 o 4 frases. Qué pasó y en qué quedó.
+
+- puntosClave: lo que de verdad importa, en frases cortas. Entre 3 y 8.
+
+- datosDelPuesto: toda condición concreta que se mencionara, con su concepto y su valor: rango salarial, horario, días de oficina, tipo de contrato, tamaño del equipo, plazos del proceso, quién sería su responsable, herramientas. Cópialas como se dijeron. Si en los apuntes no aparece ninguna, lista vacía. NO rellenes con lo que pone la oferta: aquí solo va lo que salió en la reunión.
+
+- preguntasQueMeHicieron: las preguntas que le hicieron y que aparezcan en los apuntes. Para cada una: "pregunta", "comoRespondi" (lo que contestó según los apuntes, o "no queda claro en los apuntes" si no se sabe) y "mejorRespuesta" (cómo contestarla la próxima vez, apoyada solo en hechos de su perfil, 40-90 palabras). Si contestó bien, dilo en mejorRespuesta y no la cambies por cambiarla.
+
+- compromisosMios: lo que él se comprometió a hacer o mandar, con el plazo si lo dijo. Frases cortas que empiecen por el verbo. Esto es lo primero que se olvida.
+
+- compromisosDeEllos: lo que la empresa se comprometió a hacer, con el plazo si lo dieron.
+
+- preguntasSinResponder: lo que él preguntó y no le contestaron, o le contestaron a medias. Esto es lo que hay que volver a preguntar.
+
+- senalesBuenas: indicios reales de que el proceso va bien. Solo si están en los apuntes. Lista vacía antes que adornar.
+
+- senalesDeAlerta: lo que conviene mirar de cerca. Por ejemplo: el puesto cambió respecto a la oferta, el sueldo que mencionaron está por debajo de su mínimo, no supieron explicar a quién reportaría, el proceso lleva más rondas de las dichas, rotación en el equipo, una prueba técnica larga sin pagar, presión para decidir rápido. Lista vacía si no hay ninguna: no inventes alarmas para rellenar.
+
+- incoherencias: cosas que él dijo en la reunión y su perfil maestro NO respalda, por ejemplo un nivel de idioma, una métrica, una herramienta o una responsabilidad de más. Para cada una: "afirmacion" (lo que dijo), "problema" (por qué no se sostiene) y "comoCorregir" (cómo reencuadrarlo en la siguiente conversación sin desdecirse del todo). Lista vacía si no hay ninguna. Esta es la parte más importante del resumen: lo que se promete en una llamada se cobra en la siguiente.
+
+- aReforzar: qué tiene que preparar para la próxima ronda, a partir de lo que se vio flojo en esta. Entre 2 y 5.
+
+- proximoPaso: el siguiente paso concreto y de quién depende, en una frase. Si en los apuntes no se dijo, escribe qué debería proponer él.
+
+- seguimiento: el mensaje de seguimiento para mandar en las próximas 24 horas, listo para copiar. Entre 60 y 110 palabras. Tiene que citar algo concreto de la reunión, confirmar lo que él prometió y retomar como mucho una pregunta que quedó sin respuesta. Sin volver a presentarse y sin relleno de cortesía.
+
+Trabaja solo con lo que digan los apuntes. Si algo no está, no lo completes con lo que suele pasar en estas reuniones: deja la lista vacía o di que no queda claro. Un resumen que inventa un compromiso es peor que no tener resumen.`;
 }
 
 /**

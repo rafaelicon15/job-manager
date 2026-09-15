@@ -8,6 +8,8 @@ import type {
   Idioma,
   Incoherencia,
   PerfilMaestro,
+  Reunion,
+  ResumenReunion,
   Vacante,
 } from "./types";
 import {
@@ -20,6 +22,7 @@ import {
   promptHilo,
   promptCarta,
   promptEntrevista,
+  promptReunion,
   promptDocumento,
 } from "./prompts";
 
@@ -866,6 +869,71 @@ export async function probarClave(
   }
 }
 
+const esquemaReunion = {
+  type: S.OBJECT,
+  properties: {
+    titulo: { type: S.STRING },
+    resumen: { type: S.STRING },
+    puntosClave: listaTexto,
+    datosDelPuesto: {
+      type: S.ARRAY,
+      items: {
+        type: S.OBJECT,
+        properties: { concepto: { type: S.STRING }, valor: { type: S.STRING } },
+        required: ["concepto", "valor"],
+      },
+    },
+    preguntasQueMeHicieron: {
+      type: S.ARRAY,
+      items: {
+        type: S.OBJECT,
+        properties: {
+          pregunta: { type: S.STRING },
+          comoRespondi: { type: S.STRING },
+          mejorRespuesta: { type: S.STRING },
+        },
+        required: ["pregunta", "comoRespondi", "mejorRespuesta"],
+      },
+    },
+    compromisosMios: listaTexto,
+    compromisosDeEllos: listaTexto,
+    preguntasSinResponder: listaTexto,
+    senalesBuenas: listaTexto,
+    senalesDeAlerta: listaTexto,
+    incoherencias: {
+      type: S.ARRAY,
+      items: {
+        type: S.OBJECT,
+        properties: {
+          afirmacion: { type: S.STRING },
+          problema: { type: S.STRING },
+          comoCorregir: { type: S.STRING },
+        },
+        required: ["afirmacion", "problema", "comoCorregir"],
+      },
+    },
+    aReforzar: listaTexto,
+    proximoPaso: { type: S.STRING },
+    seguimiento: { type: S.STRING },
+  },
+  required: [
+    "titulo",
+    "resumen",
+    "puntosClave",
+    "datosDelPuesto",
+    "preguntasQueMeHicieron",
+    "compromisosMios",
+    "compromisosDeEllos",
+    "preguntasSinResponder",
+    "senalesBuenas",
+    "senalesDeAlerta",
+    "incoherencias",
+    "aReforzar",
+    "proximoPaso",
+    "seguimiento",
+  ],
+};
+
 const esquemaDocumento = {
   type: Type.OBJECT,
   properties: {
@@ -922,6 +990,29 @@ const esquemaDocumento = {
     "preguntasQueHacer",
   ],
 };
+
+/**
+ * Convierte los apuntes de una reunión en un resumen utilizable.
+ *
+ * Usa el modelo de generación, no el de análisis: el resumen incluye el mensaje
+ * de seguimiento y las respuestas reescritas, que son redacción.
+ */
+export async function resumirReunion(
+  apiKey: string,
+  modelo: string,
+  perfil: PerfilMaestro,
+  vacante: Vacante,
+  reunion: Reunion,
+  idioma: Idioma
+): Promise<ResumenReunion> {
+  const bruto = await generarJSON<Omit<ResumenReunion, "generadoEn" | "modelo">>(
+    apiKey,
+    modelo,
+    promptReunion(perfil, vacante, reunion, idioma),
+    esquemaReunion
+  );
+  return { ...bruto, generadoEn: new Date().toISOString(), modelo };
+}
 
 /**
  * Analiza un documento que manda el reclutador. Los PDFs e imágenes viajan

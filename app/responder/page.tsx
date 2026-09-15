@@ -140,6 +140,7 @@ export default function Responder() {
         documentos: [],
         notas: [],
         adjuntos: [],
+        reuniones: [],
       } as Vacante),
     [vacante, carga]
   );
