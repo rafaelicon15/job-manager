@@ -52,7 +52,10 @@ function hidratar(crudo: string | null): EstadoApp {
         documentos: v.documentos ?? [],
         notas: v.notas ?? [],
         adjuntos: v.adjuntos ?? [],
-        reuniones: v.reuniones ?? [],
+        reuniones: (v.reuniones ?? []).map((r) => ({
+          ...r,
+          materiales: r.materiales ?? [],
+        })),
       })),
       conversaciones: (guardado.conversaciones ?? []).map((c) => ({
         ...c,

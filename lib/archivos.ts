@@ -18,6 +18,15 @@
  * sigue en su disco, que es donde tiene sentido que esté.
  */
 
+import {
+  csvAMarkdown,
+  docxAMarkdown,
+  LIMITE_MARKDOWN,
+  recortarMarkdown,
+  textoAMarkdown,
+} from "./markdown";
+import { textoDePdf } from "./pdfTexto";
+
 /** Tipos que Gemini lee directamente, sin convertir. */
 const NATIVOS = new Set([
   "application/pdf",
@@ -63,7 +72,7 @@ function base64(buf: ArrayBuffer): string {
  * central del ZIP y se descomprime con DecompressionStream, que ya traen los
  * navegadores. Evita añadir una librería de 200 KB para leer un párrafo.
  */
-async function textoDeDocx(buf: ArrayBuffer): Promise<string> {
+async function xmlDeDocx(buf: ArrayBuffer): Promise<string> {
   const vista = new DataView(buf);
   const bytes = new Uint8Array(buf);
 
@@ -112,20 +121,7 @@ async function textoDeDocx(buf: ArrayBuffer): Promise<string> {
         throw new Error(`El .docx usa una compresión que no sé leer (${metodo}).`);
       }
 
-      return xml
-        .replace(/<w:p\b[^>]*\/>/g, "\n")
-        .replace(/<\/w:p>/g, "\n")
-        .replace(/<w:tab\b[^>]*\/>/g, "\t")
-        .replace(/<w:br\b[^>]*\/>/g, "\n")
-        .replace(/<[^>]+>/g, "")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&amp;/g, "&")
-        .replace(/&quot;/g, '"')
-        .replace(/&apos;/g, "'")
-        .replace(/[ \t]{2,}/g, " ")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+      return xml;
     }
 
     p += 46 + largoNombre + largoExtra + largoComent;
@@ -152,7 +148,7 @@ export async function leerArchivo(f: File): Promise<ArchivoLeido> {
   }
 
   if (DOCX.test(f.name)) {
-    const texto = await textoDeDocx(await f.arrayBuffer());
+    const texto = docxAMarkdown(await xmlDeDocx(await f.arrayBuffer()));
     if (!texto) throw new Error(`"${f.name}" no tiene texto que leer.`);
     return { ...base, via: "texto", mimeType: "text/plain", texto };
   }
@@ -173,6 +169,120 @@ export async function leerArchivo(f: File): Promise<ArchivoLeido> {
   throw new Error(
     `No puedo leer "${f.name}". Acepto PDF, imágenes, .docx, .txt, .csv, .md y .json.`
   );
+}
+
+
+// -------------------------------------------------------------- a Markdown
+
+/**
+ * Lo que cuelgas de una reunión, ya convertido.
+ *
+ * `markdown` es el caso normal y el bueno: el documento en texto, con su
+ * estructura, ligero de mandar y pequeño de guardar. `inline` es el plan B para
+ * lo que no se puede convertir de forma fiable, un PDF escaneado o una captura
+ * de pantalla: esos viajan como bytes y los lee Gemini, pero no se quedan
+ * guardados porque no caben en localStorage.
+ */
+export type MaterialLeido =
+  | {
+      nombre: string;
+      bytes: number;
+      tipo: string;
+      via: "markdown";
+      markdown: string;
+      /** Palabras del Markdown, para que se vea el peso real en pantalla. */
+      palabras: number;
+      /** Cuando el original era un PDF y hubo que extraerle el texto. */
+      extraido?: boolean;
+    }
+  | {
+      nombre: string;
+      bytes: number;
+      tipo: string;
+      via: "inline";
+      mimeType: string;
+      datos: string;
+      /** Por qué no se pudo convertir, para decírselo al usuario. */
+      motivo: string;
+    };
+
+const IMAGEN = /^image\//;
+
+/**
+ * Convierte un documento a Markdown, o lo deja en bytes si no hay forma.
+ *
+ * El orden importa. Un PDF se intenta extraer SIEMPRE antes de mandarlo
+ * nativo, porque el Markdown pesa dos órdenes de magnitud menos y se puede
+ * guardar con la reunión. Pero si lo extraído no pasa la prueba de legibilidad,
+ * el archivo se va nativo: preferimos que Gemini lea la imagen del contrato
+ * antes que pasarle un texto con las cifras rotas.
+ */
+export async function leerComoMarkdown(f: File): Promise<MaterialLeido> {
+  if (f.size > LIMITE_BYTES)
+    throw new Error(
+      `"${f.name}" pesa ${(f.size / 1048576).toFixed(1)} MB y el límite es 18 MB.`
+    );
+  if (f.size === 0) throw new Error(`"${f.name}" está vacío.`);
+
+  const base = { nombre: f.name, bytes: f.size, tipo: f.type || extension(f.name) };
+  const enMarkdown = (md: string, extraido = false): MaterialLeido => {
+    const limpio = recortarMarkdown(md, LIMITE_MARKDOWN);
+    return {
+      ...base,
+      via: "markdown",
+      markdown: limpio,
+      palabras: (limpio.match(/\S+/g) ?? []).length,
+      extraido,
+    };
+  };
+
+  if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") {
+    const { texto, legible } = await textoDePdf(await f.arrayBuffer());
+    if (legible) return enMarkdown(texto, true);
+    return {
+      ...base,
+      via: "inline",
+      mimeType: "application/pdf",
+      datos: base64(await f.arrayBuffer()),
+      motivo: texto.trim()
+        ? "El texto que trae dentro sale corrupto, así que va el PDF entero para que lo lea la IA."
+        : "Es un PDF escaneado, sin texto que extraer: va entero para que lo lea la IA.",
+    };
+  }
+
+  if (IMAGEN.test(f.type)) {
+    if (!NATIVOS.has(f.type))
+      throw new Error(`"${f.name}" está en un formato de imagen que Gemini no lee.`);
+    return {
+      ...base,
+      via: "inline",
+      mimeType: f.type,
+      datos: base64(await f.arrayBuffer()),
+      motivo: "Una imagen no se convierte a texto: va entera para que la lea la IA.",
+    };
+  }
+
+  if (DOCX.test(f.name))
+    return enMarkdown(docxAMarkdown(await xmlDeDocx(await f.arrayBuffer())));
+
+  if (/\.(csv|tsv)$/i.test(f.name)) return enMarkdown(csvAMarkdown(await f.text()));
+
+  if (TEXTO.test(f.name) || f.type.startsWith("text/"))
+    return enMarkdown(textoAMarkdown(await f.text()));
+
+  if (/\.docx?$/i.test(f.name))
+    throw new Error(
+      `"${f.name}" está en el formato .doc antiguo. Ábrelo y guárdalo como PDF o .docx.`
+    );
+
+  throw new Error(
+    `No puedo leer "${f.name}". Acepto PDF, .docx, .txt, .md, .csv, .json e imágenes.`
+  );
+}
+
+function extension(nombre: string): string {
+  const e = /\.([a-z0-9]+)$/i.exec(nombre)?.[1];
+  return e ? e.toLowerCase() : "desconocido";
 }
 
 export function tamanoLegible(bytes: number): string {

@@ -31,6 +31,7 @@ import {
   participantesDe,
   resumenComoTexto,
 } from "@/lib/reuniones";
+import MaterialesReunion, { type BytesSueltos } from "@/components/MaterialesReunion";
 
 /**
  * Las reuniones que ya han pasado en este proceso, con su resumen.
@@ -56,6 +57,10 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [idioma, setIdioma] = useState<Idioma>(estado.ajustes.idiomaPorDefecto);
+  // Un PDF escaneado no se puede guardar en localStorage, así que sus bytes se
+  // quedan aquí mientras la pestaña esté abierta. El aviso de que eso se pierde
+  // al recargar lo da MaterialesReunion.
+  const [bytes, setBytes] = useState<BytesSueltos>({});
 
   const reuniones = vacante.reuniones ?? [];
   const sinClave = !estado.ajustes.geminiApiKey;
@@ -65,13 +70,18 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
     setTrabajando(r.id);
     setError("");
     try {
+      const nativos = (r.materiales ?? [])
+        .map((m) => bytes[m.id])
+        .filter((b): b is { mimeType: string; datos: string } => Boolean(b));
+
       const resumen = await resumirReunion(
         estado.ajustes.geminiApiKey,
         estado.ajustes.modeloGeneracion || estado.ajustes.modelo,
         estado.perfil,
         vacante,
         r,
-        idioma
+        idioma,
+        nativos
       );
       actualizarReunion(vacante.id, r.id, { resumen });
       setAbierta(r.id);
@@ -213,13 +223,13 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
               <div className="flex shrink-0 gap-1.5">
                 <button
                   className="btn py-1.5 text-xs"
-                  disabled={trabajando === r.id || sinClave || !r.notasCrudas.trim()}
+                  disabled={trabajando === r.id || sinClave || !hayMaterial(r)}
                   onClick={() => resumir(r)}
                   title={
                     sinClave
                       ? "Falta la API key de Gemini en Ajustes"
-                      : !r.notasCrudas.trim()
-                        ? "Pega antes tus apuntes de la reunión"
+                      : !hayMaterial(r)
+                        ? "Pega tus apuntes o cuelga un documento de la reunión"
                         : ""
                   }
                 >
@@ -261,6 +271,15 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
                     }
                   />
                 </div>
+
+                <MaterialesReunion
+                  materiales={r.materiales ?? []}
+                  onCambio={(materiales) =>
+                    actualizarReunion(vacante.id, r.id, { materiales })
+                  }
+                  bytes={bytes}
+                  onBytes={setBytes}
+                />
 
                 {x && <Resumen reunion={r} resumen={x} />}
 
@@ -305,6 +324,11 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
       })}
     </div>
   );
+}
+
+/** Hay con qué resumir si hay apuntes o algún documento convertido. */
+function hayMaterial(r: Reunion): boolean {
+  return Boolean(r.notasCrudas.trim()) || (r.materiales ?? []).length > 0;
 }
 
 // ------------------------------------------------------------------ resumen
@@ -517,6 +541,7 @@ function FormularioReunion({
       canal: canal.trim(),
       participantes: participantesDe(gente),
       notasCrudas: notas,
+      materiales: [],
     });
   }
 
@@ -606,6 +631,10 @@ function FormularioReunion({
           value={notas}
           onChange={(e) => setNotas(e.target.value)}
         />
+        <p className="mt-1 text-xs text-[var(--color-suave)]">
+          Los documentos que mandaron (la propuesta, el plan, la prueba técnica)
+          se cuelgan al guardar, desde la reunión.
+        </p>
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         <button className="btn" onClick={onCancelar}>

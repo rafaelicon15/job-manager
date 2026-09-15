@@ -2,6 +2,7 @@ import type {
   Adjunto,
   Analisis,
   Idioma,
+  MaterialReunion,
   PerfilMaestro,
   Reunion,
   Vacante,
@@ -601,6 +602,32 @@ sin respuesta, eso sí hay que retomarlo.`;
 }
 
 /**
+ * Mete en el prompt los documentos de la reunión, ya en Markdown.
+ *
+ * Van separados de los apuntes y marcados como de la empresa por una razón
+ * concreta: los apuntes son lo que él recuerda y el documento es lo que la
+ * empresa ha puesto por escrito. Cuando se contradicen, manda el documento, y
+ * la contradicción en sí es lo más interesante del resumen.
+ */
+export function materialesComoTexto(materiales: MaterialReunion[] = []): string {
+  if (!materiales.length) return "";
+
+  const bloques = materiales.map((m, i) => {
+    const cabecera = `DOCUMENTO ${i + 1}: "${m.nombre}"${m.extraido ? " (texto extraído de un PDF)" : ""}`;
+    if (m.sinConvertir || !m.markdown)
+      return `${cabecera}\n  Va adjunto a esta petición: léelo de ahí.`;
+    return `${cabecera}\n"""\n${m.markdown}\n"""`;
+  });
+
+  return `DOCUMENTOS QUE MANDARON PARA ESTA REUNIÓN (${materiales.length})
+${bloques.join("\n\n")}
+
+Estos documentos los ha escrito la empresa; los apuntes los ha escrito él. Si
+algo del documento contradice los apuntes, manda el documento, y esa
+contradicción entra en el resumen.`;
+}
+
+/**
  * Convierte los apuntes de una llamada en un resumen utilizable.
  *
  * El acento está en lo que se pierde al colgar: qué prometió cada parte, qué
@@ -650,8 +677,10 @@ LA REUNIÓN QUE HAY QUE RESUMIR
 
   APUNTES, TRANSCRIPCIÓN O CHAT, TAL CUAL LOS PEGÓ:
   """
-  ${r.notasCrudas.slice(0, 60000)}
+  ${r.notasCrudas.slice(0, 60000) || "No dejó apuntes: trabaja solo con los documentos."}
   """
+
+${materialesComoTexto(r.materiales)}
 
 Devuelve el JSON pedido, en ${lang}:
 
@@ -683,7 +712,9 @@ Devuelve el JSON pedido, en ${lang}:
 
 - seguimiento: el mensaje de seguimiento para mandar en las próximas 24 horas, listo para copiar. Entre 60 y 110 palabras. Tiene que citar algo concreto de la reunión, confirmar lo que él prometió y retomar como mucho una pregunta que quedó sin respuesta. Sin volver a presentarse y sin relleno de cortesía.
 
-Trabaja solo con lo que digan los apuntes. Si algo no está, no lo completes con lo que suele pasar en estas reuniones: deja la lista vacía o di que no queda claro. Un resumen que inventa un compromiso es peor que no tener resumen.`;
+Trabaja solo con lo que digan los apuntes y los documentos. Si algo no está, no lo completes con lo que suele pasar en estas reuniones: deja la lista vacía o di que no queda claro. Un resumen que inventa un compromiso es peor que no tener resumen.
+
+Si un dato sale de un documento y no de la llamada, dilo entre paréntesis con el nombre del archivo. Sirve para saber qué está por escrito y qué solo se dijo de palabra, que es la diferencia entre poder reclamarlo y no poder.`;
 }
 
 /**

@@ -1003,13 +1003,16 @@ export async function resumirReunion(
   perfil: PerfilMaestro,
   vacante: Vacante,
   reunion: Reunion,
-  idioma: Idioma
+  idioma: Idioma,
+  /** Lo que no se pudo convertir a Markdown y viaja como bytes. */
+  archivos?: ArchivoInline[]
 ): Promise<ResumenReunion> {
   const bruto = await generarJSON<Omit<ResumenReunion, "generadoEn" | "modelo">>(
     apiKey,
     modelo,
     promptReunion(perfil, vacante, reunion, idioma),
-    esquemaReunion
+    esquemaReunion,
+    archivos?.length ? archivos : undefined
   );
   return { ...bruto, generadoEn: new Date().toISOString(), modelo };
 }

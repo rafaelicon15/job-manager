@@ -1,8 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { participantesDe, resumenComoTexto, etiquetaDeTipo } from "../lib/reuniones";
-import { historialReuniones, promptEntrevista, promptReunion } from "../lib/prompts";
-import type { PerfilMaestro, Reunion, ResumenReunion, Vacante } from "../lib/types";
+import {
+  historialReuniones,
+  materialesComoTexto,
+  promptEntrevista,
+  promptReunion,
+} from "../lib/prompts";
+import type {
+  MaterialReunion,
+  PerfilMaestro,
+  Reunion,
+  ResumenReunion,
+  Vacante,
+} from "../lib/types";
 
 /**
  * El apartado de reuniones guarda lo que se dice en una llamada y no queda
@@ -68,6 +79,7 @@ function reunion(parcial: Partial<Reunion> = {}): Reunion {
     canal: "Google Meet",
     participantes: [{ nombre: "Marta Ruiz", cargo: "Talent Partner" }],
     notasCrudas: "Preguntó por disponibilidad. Dije inmediata.",
+    materiales: [],
     creadaEn: "2026-09-01T11:00:00.000Z",
     actualizadaEn: "2026-09-01T11:00:00.000Z",
     ...parcial,
@@ -275,4 +287,75 @@ test("una vacante guardada antes de que existieran las reuniones no rompe nada",
   const v = { ...vacante(), reuniones: undefined } as unknown as Vacante;
   assert.doesNotThrow(() => promptEntrevista(PERFIL, v, "es"));
   assert.equal(historialReuniones(undefined), "");
+});
+
+// --------------------------------------------------- documentos colgados
+
+function material(parcial: Partial<MaterialReunion> = {}): MaterialReunion {
+  return {
+    id: "mat-1",
+    nombre: "propuesta.pdf",
+    bytes: 120000,
+    tipo: "application/pdf",
+    markdown: "# Propuesta\n\nFijo: 1.800 USD mensuales.",
+    palabras: 6,
+    subidoEn: "2026-09-01T12:00:00.000Z",
+    ...parcial,
+  };
+}
+
+test("sin documentos el bloque de material no aparece", () => {
+  assert.equal(materialesComoTexto([]), "");
+  assert.equal(materialesComoTexto(), "");
+});
+
+test("el Markdown del documento entra en el prompt", () => {
+  const r = reunion({ materiales: [material()] });
+  const p = promptReunion(PERFIL, vacante([r]), r, "es");
+  assert.match(p, /DOCUMENTOS QUE MANDARON PARA ESTA REUNIÓN \(1\)/);
+  assert.match(p, /propuesta\.pdf/);
+  assert.match(p, /Fijo: 1\.800 USD mensuales\./);
+});
+
+test("el prompt distingue lo escrito por la empresa de los apuntes de él", () => {
+  // Cuando el documento contradice los apuntes, manda el documento, y esa
+  // contradicción es lo más interesante del resumen.
+  const r = reunion({ materiales: [material()] });
+  const p = promptReunion(PERFIL, vacante([r]), r, "es");
+  assert.match(p, /los ha escrito la empresa; los apuntes los ha escrito él/);
+  assert.match(p, /manda el documento/);
+});
+
+test("un texto extraído de un PDF se marca como tal", () => {
+  // El modelo debe saber que ese texto viene de una extracción y puede traer
+  // costuras, en lugar de tratarlo como si lo hubiera tecleado alguien.
+  const texto = materialesComoTexto([material({ extraido: true })]);
+  assert.match(texto, /texto extraído de un PDF/);
+});
+
+test("lo que no se pudo convertir se anuncia como adjunto, sin cuerpo", () => {
+  const texto = materialesComoTexto([
+    material({ markdown: "", palabras: 0, sinConvertir: "Es un PDF escaneado." }),
+  ]);
+  assert.match(texto, /Va adjunto a esta petición/);
+  assert.ok(!texto.includes('"""'), "no hay contenido que encerrar");
+});
+
+test("se puede resumir una reunión con documentos y sin apuntes", () => {
+  // Llega la propuesta por correo y no hubo llamada que apuntar.
+  const r = reunion({ notasCrudas: "", materiales: [material()] });
+  const p = promptReunion(PERFIL, vacante([r]), r, "es");
+  assert.match(p, /trabaja solo con los documentos/);
+  assert.match(p, /Fijo: 1\.800 USD mensuales\./);
+});
+
+test("el prompt pide señalar de qué archivo sale cada dato", () => {
+  const r = reunion({ materiales: [material()] });
+  const p = promptReunion(PERFIL, vacante([r]), r, "es");
+  assert.match(p, /dilo entre paréntesis con el nombre del archivo/);
+});
+
+test("una reunión guardada antes de los documentos no rompe el prompt", () => {
+  const r = { ...reunion(), materiales: undefined } as unknown as Reunion;
+  assert.doesNotThrow(() => promptReunion(PERFIL, vacante([r]), r, "es"));
 });

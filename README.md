@@ -62,7 +62,7 @@ tres necesitan claves gratuitas y añaden España, México y Venezuela: ver
 | **Carta y mensajes** | Carta de presentación y mensaje de contacto, en español o inglés |
 | **Conversaciones** | Pega un hilo de LinkedIn, correo o WhatsApp y lo estructura. Detecta lo que prometiste y tu perfil no respalda |
 | **Entrevista** | Preguntas probables con tu respuesta preparada, y las que conviene hacer tú |
-| **Reuniones** | Cada llamada resumida: qué prometió cada parte, qué condiciones salieron y el seguimiento listo para mandar |
+| **Reuniones** | Cada llamada resumida, con los documentos que mandaron convertidos a Markdown: qué prometió cada parte, qué condiciones salieron y el seguimiento listo para mandar |
 | **Extensión Chrome** | Lee el texto de la vacante que tengas abierta y la manda a la app |
 
 ## Qué NO hace, a propósito

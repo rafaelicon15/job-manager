@@ -308,9 +308,40 @@ export interface Reunion {
   participantes: { nombre: string; cargo?: string }[];
   /** Apuntes, transcripción o chat de la llamada, tal cual. */
   notasCrudas: string;
+  /** Lo que mandaron por escrito: la propuesta, el plan, la prueba técnica. */
+  materiales: MaterialReunion[];
   resumen?: ResumenReunion;
   creadaEn: string;
   actualizadaEn: string;
+}
+
+/**
+ * Un documento que acompaña a una reunión, ya convertido a Markdown.
+ *
+ * Se guarda el Markdown y no el archivo. Un PDF de veinte páginas son cientos
+ * de KB y localStorage ronda los 5 MB; el mismo documento en Markdown ocupa
+ * cuarenta y cabe de sobra, así que el material se queda con la reunión para
+ * siempre y no hay que volver a subirlo cada vez que se regenera el resumen.
+ *
+ * `sinConvertir` es la excepción: un PDF escaneado o una captura no tienen
+ * texto que extraer y tienen que ir como bytes a Gemini. De esos se guarda la
+ * ficha y el motivo, pero no el contenido: para volver a resumirlos hay que
+ * subirlos otra vez.
+ */
+export interface MaterialReunion {
+  id: string;
+  nombre: string;
+  bytes: number;
+  /** mimeType si lo trae el navegador, o la extensión. */
+  tipo: string;
+  /** El documento en Markdown. Vacío cuando no se pudo convertir. */
+  markdown: string;
+  palabras: number;
+  /** true cuando el Markdown salió de extraerle el texto a un PDF. */
+  extraido?: boolean;
+  /** Por qué no se pudo convertir. Su presencia significa que no hay Markdown. */
+  sinConvertir?: string;
+  subidoEn: string;
 }
 
 export interface ResumenReunion {
