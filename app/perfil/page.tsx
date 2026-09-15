@@ -72,6 +72,13 @@ export default function Perfil() {
           <Campo label="Nombre" valor={p.nombre} onChange={(v) => set({ nombre: v })} />
           <Campo label="Email" valor={p.email} onChange={(v) => set({ email: v })} />
           <Campo
+            label="Usuario"
+            valor={p.usuario ?? ""}
+            placeholder="anatorres"
+            onChange={(v) => set({ usuario: v })}
+            ayuda="El usuario con el que creas las cuentas en los portales. Muchos formularios piden 'Email o usuario' y usar siempre el mismo evita acabar con una cuenta por portal y ninguna recordada."
+          />
+          <Campo
             label="Teléfono"
             valor={p.telefono}
             onChange={(v) => set({ telefono: v })}

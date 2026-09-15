@@ -179,7 +179,55 @@ test("el nombre se parte aparte de la ubicación", () => {
     nombre: "Ana María Torres Gil",
     ubicacion: "Maracay, Aragua, Venezuela",
   });
-  assert.equal(f?.nombrePila, "Ana María");
+  assert.equal(f?.nombrePila, "Ana", "el nombre de pila es uno, no dos");
+  assert.equal(f?.segundoNombre, "María");
   assert.equal(f?.apellidos, "Torres Gil");
   assert.equal(f?.ciudad, "Maracay");
+});
+
+test("una inicial no entra nunca en el nombre de pila", () => {
+  // Con "Ana B. Torres" el formulario acabaría creando la cuenta a nombre de
+  // "Ana B.", y de la inicial no hay forma de sacar el nombre de detrás: se
+  // queda fuera de los dos campos.
+  const f = leerFichaDelPopup({ nombre: "Ana B. Torres" });
+  assert.equal(f?.nombrePila, "Ana");
+  assert.equal(f?.segundoNombre, "");
+  assert.equal(f?.apellidos, "Torres");
+});
+
+test("con dos tramos, el segundo son los apellidos", () => {
+  const f = leerFichaDelPopup({ nombre: "Ana Torres" });
+  assert.equal(f?.nombrePila, "Ana");
+  assert.equal(f?.apellidos, "Torres");
+  assert.equal(f?.segundoNombre, "");
+});
+
+test("con tres tramos sin inicial, los dos últimos son apellidos", () => {
+  const f = leerFichaDelPopup({ nombre: "Ana Torres Gil" });
+  assert.equal(f?.nombrePila, "Ana");
+  assert.equal(f?.apellidos, "Torres Gil");
+});
+
+test("lo que pongas en el perfil manda sobre la partición automática", () => {
+  const f = leerFichaDelPopup({
+    nombre: "Ana B. Torres",
+    nombrePila: "Anabel",
+    segundoNombre: "Beatriz",
+    apellidos: "Torres Gil",
+  });
+  assert.equal(f?.nombrePila, "Anabel");
+  assert.equal(f?.segundoNombre, "Beatriz");
+  assert.equal(f?.apellidos, "Torres Gil");
+});
+
+test("el usuario viaja en la ficha y no se saca del correo", () => {
+  const f = leerFichaDelPopup({
+    nombre: "Ana Torres",
+    email: "ana.torres@ejemplo.com",
+    usuario: "anatorres",
+  });
+  assert.equal(f?.usuario, "anatorres");
+
+  const sin = leerFichaDelPopup({ nombre: "Ana Torres", email: "ana.torres@ejemplo.com" });
+  assert.equal(sin?.usuario, "", "inventarlo crearía una cuenta con un usuario que no es el tuyo");
 });

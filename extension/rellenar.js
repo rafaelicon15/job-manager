@@ -145,6 +145,47 @@ async function rellenarFormulario(ficha) {
   }
 
   /**
+   * Reconoce una lista de países por sus opciones, no por su etiqueta.
+   *
+   * Medido en un registro real: el desplegable del país no tenía etiqueta
+   * visible ni `name` legible, así que ninguna regla lo tocaba y se quedaba en
+   * "United States". Pero la lista en sí es inconfundible: nadie escribe un
+   * desplegable de doscientas opciones con Alemania, Japón y Brasil dentro si
+   * no está preguntando el país.
+   *
+   * Se exigen las dos señales, muchas opciones y varios centinelas, para no
+   * confundirla con una lista de nacionalidades cortada o de mercados.
+   */
+  const CENTINELAS_PAIS = [
+    "united states",
+    "germany",
+    "japan",
+    "brazil",
+    "india",
+    "france",
+    "canada",
+    "mexico",
+    "spain",
+    "australia",
+    "alemania",
+    "jap[óo]n",
+    "brasil",
+    "francia",
+    "canad[áa]",
+    "m[ée]xico",
+    "espa[ñn]a",
+    "estados unidos",
+  ];
+  function esListaDePaises(textos) {
+    if (textos.length < 50) return false;
+    const limpios = textos.map((t) => t.trim().toLowerCase());
+    const encontrados = CENTINELAS_PAIS.filter((c) =>
+      limpios.some((t) => new RegExp(`^${c}\\b`).test(t))
+    ).length;
+    return encontrados >= 4;
+  }
+
+  /**
    * Preguntas abiertas del empleador: experiencia, motivación, resultados.
    * Ninguna se contesta con un dato de la ficha, y buscar palabras sueltas
    * dentro de ellas sale caro. Medido en Adzuna: la pregunta "What hands-on
@@ -165,6 +206,10 @@ async function rellenarFormulario(ficha) {
     // El correo SECUNDARIO no se rellena con el principal. Poner el mismo en
     // los dos no aporta nada y el portal puede rechazarlo por duplicado;
     // además es una decisión suya tener o no un segundo correo.
+    // El usuario va ANTES del correo a propósito: un campo que dice "Email o
+    // usuario" acepta los dos, y usar siempre el mismo usuario evita acabar
+    // con una cuenta por portal y ninguna recordada.
+    [/usuario|user ?name|\buser\b|\bnick\b|alias/, ficha.usuario],
     [
       /^(?!.*secundario)(?!.*secondary)(?!.*alternativ)(?!.*alternate)(?!.*backup)(?!.*otro correo).*(correo|e ?-?mail)/,
       ficha.email,
@@ -243,6 +288,22 @@ async function rellenarFormulario(ficha) {
   let escritos = 0;
   let pendientes = 0;
 
+  /**
+   * Campos de confirmación: "Re-enter email", "Confirmar contraseña",
+   * "Repite el usuario".
+   *
+   * Estos NO se rellenan con el dato del perfil, sino con lo que haya en el
+   * campo que confirman. Medido en un formulario real: el primer campo decía
+   * "Email o usuario" y llevaba el usuario, y el de confirmar se rellenó con
+   * el correo completo. Dos valores distintos en un par que tiene que
+   * coincidir: el portal lo rechaza y encima cuesta ver por qué.
+   */
+  const CONFIRMACION =
+    /re-? ?enter|re-? ?type|re-? ?peat|confirm|confirmar|repetir|repite|verificar|vuelve a (escribir|introducir)/i;
+
+  /** Último campo rellenado por cada regla, para poder copiarlo al confirmar. */
+  const ultimoPorRegla = new Map();
+
   for (const el of campos) {
     const desc = describir(el);
 
@@ -263,32 +324,64 @@ async function rellenarFormulario(ficha) {
       continue;
     }
 
-    // Un desplegable sin opcion vacia arranca ya con la primera seleccionada,
-    // asi que "tiene valor" no significa que el usuario haya elegido. Dejarlo
-    // como esta es peor que rellenarlo: se enviaria "Argentina" a alguien de
-    // Venezuela sin que nadie lo haya decidido. Si el indice es 0 se trata
-    // como sin elegir; si es mayor, lo eligio el usuario y no se toca.
+    let valor = "";
+    let iRegla = -1;
+    // Una pregunta abierta no se contesta con un dato de la ficha, y buscarle
+    // palabras sueltas dentro provoca respuestas absurdas.
+    if (!PREGUNTA_ABIERTA.test(desc)) {
+      for (let i = 0; i < REGLAS.length; i++) {
+        const [patron, v] = REGLAS[i];
+        if (v && patron.test(desc)) {
+          valor = v;
+          iRegla = i;
+          break;
+        }
+      }
+    }
+
+    // Se apunta el campo ANTES de decidir si se rellena, y aunque ya tenga
+    // algo: si el usuario escribió el primero a mano, el de confirmar tiene
+    // que copiar eso y no el dato del perfil.
+    if (iRegla !== -1 && !CONFIRMACION.test(desc)) ultimoPorRegla.set(iRegla, el);
+
     // Los desplegables se examinan siempre. "Tener valor" no significa que lo
     // haya elegido nadie: muchos portales preseleccionan por IP. Medido en
     // HireSkys, el país venía en "Pakistan" mientras la ciudad decía "Maracay";
     // enviar eso es peor que cualquier campo en blanco. La decisión de tocarlo
     // o no se toma abajo, y solo se pisa una selección con una coincidencia
     // exacta, avisando en ámbar.
-    if (!(el instanceof HTMLSelectElement) && (el.value ?? "").trim()) continue;
+    //
+    // Los campos de confirmación también siguen adelante con valor: si arriba
+    // se cambió algo, aquí hay que igualarlo.
+    if (
+      !(el instanceof HTMLSelectElement) &&
+      !CONFIRMACION.test(desc) &&
+      (el.value ?? "").trim()
+    )
+      continue;
 
-    let valor = "";
-    // Una pregunta abierta no se contesta con un dato de la ficha, y buscarle
-    // palabras sueltas dentro provoca respuestas absurdas.
-    if (!PREGUNTA_ABIERTA.test(desc)) {
-      for (const [patron, v] of REGLAS) {
-        if (v && patron.test(desc)) {
-          valor = v;
-          break;
-        }
+    // Si es un campo de confirmación, lo que vale es lo que haya arriba, no
+    // lo que diga el perfil: el par tiene que coincidir.
+    if (CONFIRMACION.test(desc)) {
+      const original = ultimoPorRegla.get(iRegla);
+      const arriba = original ? (original.value ?? "").trim() : "";
+      if (!arriba) {
+        resaltar(el, "#fbbf24", "Repite aquí lo que pusiste arriba.");
+        pendientes++;
+        continue;
       }
+      escribir(el, arriba);
+      resaltar(el, "#34d399", "Copiado del campo de arriba.");
+      escritos++;
+      continue;
     }
 
     if (el instanceof HTMLSelectElement) {
+      // Sin etiqueta útil, las opciones todavía pueden delatar de qué va la
+      // lista. Un desplegable de países se rellena con el país y punto.
+      if (!valor && ficha.pais && esListaDePaises([...el.options].map((o) => o.text)))
+        valor = ficha.pais;
+
       if (!valor) {
         resaltar(el, "#fbbf24", "Elige tú esta opción.");
         pendientes++;
@@ -436,6 +529,12 @@ async function rellenarFormulario(ficha) {
           /\(\+\d/.test(o.innerText || o.textContent || "")
         ).length;
         if (opciones.length >= 3 && conPrefijo >= opciones.length * 0.7)
+          valor = ficha.pais;
+        // Y si no llevan prefijo pero son países, también es el país.
+        if (
+          !valor &&
+          esListaDePaises(opciones.map((o) => o.innerText || o.textContent || ""))
+        )
           valor = ficha.pais;
         if (!valor) {
           el.click(); // no era esto: se cierra y se deja como estaba

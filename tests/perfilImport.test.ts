@@ -119,6 +119,14 @@ test("lleva la dirección postal y la fecha de nacimiento al perfil", () => {
   assert.equal(r.perfil?.fechaNacimiento, "1988-03-02");
 });
 
+test("lleva el usuario de los portales al perfil", () => {
+  const r = validarPerfilPegado(JSON.stringify({ ...minimo, usuario: "anatorres" }));
+  assert.equal(r.perfil?.usuario, "anatorres");
+
+  const sin = validarPerfilPegado(JSON.stringify(minimo));
+  assert.equal(sin.perfil?.usuario, undefined, "no se deduce del correo");
+});
+
 test("acepta el código postal donde vivía antes, suelto en el perfil", () => {
   // Una IA que vea un perfil exportado con la forma anterior lo pondrá ahí.
   const r = validarPerfilPegado(JSON.stringify({ ...minimo, codigoPostal: "46001" }));

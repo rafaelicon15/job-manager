@@ -87,6 +87,13 @@ export interface PerfilMaestro {
   titular: string;
   titularEn: string;
   email: string;
+  /**
+   * El usuario con el que se crean las cuentas en los portales. Se guarda
+   * aparte del correo porque muchos formularios piden "Email o usuario" y
+   * usar siempre el mismo evita acabar con una cuenta por portal y ninguna
+   * recordada.
+   */
+  usuario?: string;
   telefono: string;
   ubicacion: string;
   direccionPostal?: DireccionPostal;

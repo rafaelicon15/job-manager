@@ -213,6 +213,7 @@ export function validarPerfilPegado(entrada: string): ResultadoImport {
     titular: txt(p.titular),
     titularEn: txt(p.titularEn) || txt(p.titular),
     email: txt(p.email),
+    usuario: txt(p.usuario) || undefined,
     telefono: txt(p.telefono),
     ubicacion: txt(p.ubicacion),
     nombrePila: txt(p.nombrePila) || undefined,

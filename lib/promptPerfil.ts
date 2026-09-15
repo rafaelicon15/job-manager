@@ -56,6 +56,7 @@ Sé conservador. Un 4 mal puesto se cae en la primera entrevista técnica.
   "titular": "Titular profesional en español, máximo 90 caracteres",
   "titularEn": "El mismo titular en inglés",
   "email": "correo@ejemplo.com",
+  "usuario": "El usuario con el que creo cuentas en los portales, si te lo digo. No lo inventes ni lo saques del correo.",
   "telefono": "+00 000 0000000",
   "nombrePila": "Solo el nombre de pila, sin iniciales. Ejemplo: Ana",
   "segundoNombre": "Segundo nombre completo, si lo tengo y te lo digo. Vacío si no.",

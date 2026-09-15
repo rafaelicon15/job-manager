@@ -149,15 +149,32 @@ function leerFicha() {
   const enlace = (patron) =>
     (p.links || []).find((l) => patron.test(l.etiqueta || "") || patron.test(l.url || ""))?.url || "";
 
-  // El nombre partido se toma del perfil si está. Partirlo por espacios es un
-  // último recurso: "Ana B. Torres" da "Ana B." de nombre de pila, y de
-  // la inicial no hay forma de sacar el segundo nombre.
-  const trozos = p.nombre.trim().split(/\s+/);
-  const nombrePila =
-    p.nombrePila || trozos.slice(0, trozos.length > 2 ? 2 : 1).join(" ");
-  const apellidos =
-    p.apellidos ||
-    (trozos.length > 2 ? trozos.slice(2).join(" ") : trozos.slice(1).join(" "));
+  // El nombre partido se toma del perfil si está. Partirlo es el último
+  // recurso y tiene dos reglas que no son evidentes:
+  //
+  //  - El nombre de pila es SOLO el primer trozo. Antes se tomaban los dos
+  //    primeros y "Ana B. Torres" daba "Ana B." en el campo "First name".
+  //  - Una inicial suelta ("B.") no es un nombre: no entra en el nombre de
+  //    pila ni en los apellidos, porque de ella no se puede sacar "Beatriz".
+  //
+  // Con tres trozos sin inicial el reparto es ambiguo de verdad: "Ana María
+  // Torres" puede ser un nombre compuesto o un nombre con dos apellidos. Se
+  // opta por dos apellidos, que es lo más común en español, y por eso el
+  // perfil tiene campos propios: rellenarlos quita la adivinanza.
+  const esInicial = (t) => /^[a-zà-ÿ]\.?$/i.test(t);
+  const trozos = p.nombre.trim().split(/\s+/).filter(Boolean);
+  const nombrePila = p.nombrePila || trozos[0] || "";
+  let segundoAuto = "";
+  let apellidosAuto = "";
+  if (trozos.length === 2) {
+    apellidosAuto = trozos[1];
+  } else if (trozos.length === 3) {
+    apellidosAuto = esInicial(trozos[1]) ? trozos[2] : trozos.slice(1).join(" ");
+  } else if (trozos.length > 3) {
+    if (!esInicial(trozos[1])) segundoAuto = trozos[1];
+    apellidosAuto = trozos.slice(2).join(" ");
+  }
+  const apellidos = p.apellidos || apellidosAuto;
 
   // "Maracay, Aragua, Venezuela" son ciudad, estado y país, en ese orden.
   // Antes se tomaba el primero como ciudad y TODO lo demás como país, así que
@@ -180,9 +197,10 @@ function leerFicha() {
     ficha: {
       nombre: p.nombre,
       nombrePila,
-      segundoNombre: p.segundoNombre || "",
+      segundoNombre: p.segundoNombre || segundoAuto,
       apellidos,
       email: p.email || "",
+      usuario: p.usuario || "",
       telefono: p.telefono || "",
       calle: d.calle || "",
       ciudad,
