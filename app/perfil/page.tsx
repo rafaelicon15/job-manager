@@ -18,6 +18,9 @@ export default function Perfil() {
 
   const set = (parcial: Partial<PerfilMaestro>) => guardarPerfil({ ...p, ...parcial });
 
+  const setDir = (parcial: Partial<NonNullable<PerfilMaestro["direccionPostal"]>>) =>
+    set({ direccionPostal: { ...(p.direccionPostal ?? {}), ...parcial } });
+
   const setExp = (id: string, parcial: Partial<Experiencia>) =>
     set({
       experiencias: p.experiencias.map((e) => (e.id === id ? { ...e, ...parcial } : e)),
@@ -79,11 +82,6 @@ export default function Perfil() {
             onChange={(v) => set({ ubicacion: v })}
           />
           <Campo
-            label="Código postal"
-            valor={p.codigoPostal ?? ""}
-            onChange={(v) => set({ codigoPostal: v })}
-          />
-          <Campo
             label="Fecha de nacimiento"
             valor={p.fechaNacimiento ?? ""}
             onChange={(v) => set({ fechaNacimiento: v })}
@@ -91,6 +89,36 @@ export default function Perfil() {
             ayuda="Opcional. Solo para que la extensión rellene los formularios que la piden. No sale en el CV ni se manda a ningún sitio."
           />
         </div>
+        <div>
+          <p className="etiqueta">Nombre partido, para los formularios</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Campo
+              label="Nombre"
+              valor={p.nombrePila ?? ""}
+              placeholder="Ana"
+              onChange={(v) => set({ nombrePila: v })}
+            />
+            <Campo
+              label="Segundo nombre"
+              valor={p.segundoNombre ?? ""}
+              placeholder="Beatriz"
+              onChange={(v) => set({ segundoNombre: v })}
+            />
+            <Campo
+              label="Apellidos"
+              valor={p.apellidos ?? ""}
+              placeholder="Torres Gil"
+              onChange={(v) => set({ apellidos: v })}
+            />
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-suave)]">
+            Muchos formularios piden el nombre en trozos. Esto no se puede
+            deducir: de una inicial no hay forma de sacar el nombre que hay
+            detrás. Si lo dejas vacío se parte lo mejor posible, pero
+            rellenarlo lo arregla.
+          </p>
+        </div>
+
         <Campo
           label="Titular (español)"
           valor={p.titular}
@@ -154,6 +182,43 @@ export default function Perfil() {
               <Plus size={15} /> Añadir enlace
             </button>
           </div>
+        </div>
+      </Bloque>
+
+      <Bloque titulo="Dirección postal">
+        <p className="text-xs leading-relaxed text-[var(--color-suave)]">
+          A dónde te mandan las cosas, que no tiene por qué ser donde trabajas.
+          La <strong>ubicación</strong> de arriba es la profesional y sale en el
+          CV; esto <strong>solo</strong> se usa para rellenar formularios y no
+          aparece en ningún documento. Déjalo vacío si prefieres escribirlo a
+          mano cada vez.
+        </p>
+        <Campo
+          label="Calle y número"
+          valor={p.direccionPostal?.calle ?? ""}
+          onChange={(v) => setDir({ calle: v })}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo
+            label="Ciudad"
+            valor={p.direccionPostal?.ciudad ?? ""}
+            onChange={(v) => setDir({ ciudad: v })}
+          />
+          <Campo
+            label="Estado o provincia"
+            valor={p.direccionPostal?.provincia ?? ""}
+            onChange={(v) => setDir({ provincia: v })}
+          />
+          <Campo
+            label="Código postal"
+            valor={p.direccionPostal?.codigoPostal ?? ""}
+            onChange={(v) => setDir({ codigoPostal: v })}
+          />
+          <Campo
+            label="País"
+            valor={p.direccionPostal?.pais ?? ""}
+            onChange={(v) => setDir({ pais: v })}
+          />
         </div>
       </Bloque>
 

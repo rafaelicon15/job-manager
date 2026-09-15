@@ -161,8 +161,21 @@ async function rellenarFormulario(ficha) {
     // Los separadores llegan aquí ya convertidos en espacios, así que los
     // patrones tienen que contar con ellos: "E-mail" se ve como "e mail" y
     // "LinkedIn" como "linked in", porque el corte de camelCase los separa.
-    [/correo|e ?-?mail/, ficha.email],
-    [/tel[ée]fono|celular|m[óo]vil|whatsapp|phone|movil/, ficha.telefono],
+    //
+    // El correo SECUNDARIO no se rellena con el principal. Poner el mismo en
+    // los dos no aporta nada y el portal puede rechazarlo por duplicado;
+    // además es una decisión suya tener o no un segundo correo.
+    [
+      /^(?!.*secundario)(?!.*secondary)(?!.*alternativ)(?!.*alternate)(?!.*backup)(?!.*otro correo).*(correo|e ?-?mail)/,
+      ficha.email,
+    ],
+    // El teléfono FIJO tampoco se rellena con el móvil: no es el mismo número
+    // y decir que lo es puede costar una llamada perdida. Solo se rellenan el
+    // móvil y los campos de teléfono a secas.
+    [
+      /^(?!.*\bfijo\b)(?!.*home ?phone)(?!.*landline)(?!.*tel[ée]fono de casa).*(tel[ée]fono|celular|m[óo]vil|movil|whatsapp|phone|mobile)/,
+      ficha.telefono,
+    ],
     [/linked ?-?in/, ficha.linkedin],
     [/portafolio|portfolio|sitio web|p[áa]gina web|website|url personal/, ficha.web],
     [
@@ -181,14 +194,31 @@ async function rellenarFormulario(ficha) {
       /^(?!.*civil)(?!.*marital).*(\bestado\b|provincia|\bstate\b|\bregi[óo]n\b|departamento|\bprovince\b)/,
       ficha.provincia,
     ],
-    // NO existe una regla para "dirección" o "address": el perfil no guarda la
-    // calle, y la que había rellenaba esos campos con la CIUDAD. Medido en un
-    // formulario real: el campo "Street" acabó diciendo "Maracay". Un dato en
-    // el campo equivocado es peor que un campo vacío, porque se envía sin que
-    // nadie lo mire.
+    // La calle sale de la dirección postal del perfil, NUNCA de la ciudad.
+    // Antes había una regla que mapeaba "dirección" a la ciudad y el campo
+    // "Street" acababa diciendo "Maracay". Si no hay calle guardada, el campo
+    // se queda vacío: un dato en el sitio equivocado es peor que uno ausente,
+    // porque se envía sin que nadie lo mire.
+    [
+      /^(?!.*e ?-?mail)(?!.*correo).*(direcci[óo]n|address|\bcalle\b|\bstreet\b|domicilio)/,
+      ficha.calle,
+    ],
+    // El segundo nombre solo se pone si está en el perfil: de una inicial no
+    // se puede deducir, y de un apellido tampoco.
+    [/segundo nombre|middle ?name|\bmiddle\b|otro nombre/, ficha.segundoNombre],
     [/nombre completo|full ?name|nombre y apellido/, ficha.nombre],
-    [/apellidos?|last ?name|surname/, ficha.apellidos],
-    [/^(?!.*empresa)(?!.*compa[ñn])(?!.*usuario).*(nombres?|first ?name|given)/, ficha.nombrePila],
+    // "First" y "Last" a secas son etiquetas habituales en los formularios en
+    // inglés, pero también aparecen en "last company" o "first day". Se
+    // aceptan excluyendo esos usos, que son los que se ven en un formulario
+    // de empleo.
+    [
+      /^(?!.*empresa)(?!.*company)(?!.*salar)(?!.*d[íi]a\b)(?!.*\bday\b)(?!.*\bjob\b)(?!.*puesto)(?!.*login)(?!.*acceso).*(apellidos?|last ?name|surname|\blast\b)/,
+      ficha.apellidos,
+    ],
+    [
+      /^(?!.*empresa)(?!.*compa[ñn])(?!.*company)(?!.*usuario)(?!.*d[íi]a\b)(?!.*\bday\b)(?!.*\bjob\b)(?!.*idioma)(?!.*language)(?!.*impres).*(nombres?|first ?name|given|\bfirst\b)/,
+      ficha.nombrePila,
+    ],
     [/titular|headline|puesto actual|cargo actual|current (title|position)/, ficha.titular],
     [/perfil profesional|sobre m[íi]|resumen|summary|about you/, ficha.resumen],
   ];
@@ -270,7 +300,19 @@ async function rellenarFormulario(ficha) {
       const buscado = valor.toLowerCase().trim();
       const opciones = [...el.options].filter((o) => o.text.trim() && o.value !== "");
       const exacta = opciones.find((o) => o.text.toLowerCase().trim() === buscado);
+
+      // Muchas listas adornan la opción: el desplegable de prefijo telefónico
+      // dice "Venezuela (+58)". Vale como coincidencia siempre que el adorno
+      // venga después de la palabra completa y NINGUNA otra opción empiece
+      // igual: con "Virgin Islands" habría dos y elegir una sería adivinar.
+      const empiezanIgual = opciones.filter((o) => {
+        const t = o.text.toLowerCase().trim();
+        return t.startsWith(buscado) && !/[a-zà-ÿ]/.test(t.charAt(buscado.length));
+      });
+      const unicaPorPrefijo = empiezanIgual.length === 1 ? empiezanIgual[0] : undefined;
+
       const aproximada =
+        unicaPorPrefijo ||
         opciones.find((o) => o.text.toLowerCase().includes(buscado)) ||
         opciones.find((o) => buscado.includes(o.text.toLowerCase().trim()));
 
@@ -280,12 +322,13 @@ async function rellenarFormulario(ficha) {
       // verdad, y tratarla como vacía dejaba pasar coincidencias aproximadas
       // que pisaban una elección real.
       //
-      // Sin elegir: vale cualquier coincidencia. Ya elegido: solo se pisa con
-      // una EXACTA. "Venezuela" contra "Pakistan" es exacta y hay que
-      // corregirla; "Venezuela" contra "Venezuela (Bolivariana)" no lo es, y
-      // ahí es mejor avisar que decidir por él.
+      // Sin elegir: vale la exacta o la única que empieza igual. Ya elegido:
+      // solo se pisa con una de esas dos, nunca con una coincidencia vaga.
+      // "Venezuela" contra "Pakistan" hay que corregirlo; "Venezuela" contra
+      // dos opciones que empiezan por "Venezuela" es adivinar.
       const sinElegir = !(el.value ?? "").trim();
-      const opcion = sinElegir ? (exacta ?? aproximada) : exacta;
+      const segura = exacta ?? unicaPorPrefijo;
+      const opcion = sinElegir ? (exacta ?? aproximada) : segura;
 
       if (opcion) {
         const habiaAlgo = !sinElegir && el.value !== opcion.value;
@@ -360,27 +403,64 @@ async function rellenarFormulario(ficha) {
         valor = v;
         break;
       }
-    if (!valor) continue;
+
+    // Si la etiqueta no dice nada útil, todavía puede tratarse del prefijo
+    // telefónico: ese desplegable se llama "Code" a secas, que por sí solo no
+    // significa nada —hay códigos de empleado y de promoción—, pero sus
+    // OPCIONES lo delatan: "Venezuela (+58)". Hay que abrir la lista para
+    // verlas, así que se abre y, si no encaja, se cierra sin tocar nada.
+    const puedeSerPrefijo = !valor && Boolean(ficha.pais);
+    if (!valor && !puedeSerPrefijo) continue;
 
     const actual = (el.innerText || el.textContent || "").trim().toLowerCase();
-    if (actual.includes(valor.toLowerCase())) {
+    if (valor && actual.includes(valor.toLowerCase())) {
       resaltar(el, "#34d399", "Ya estaba en el valor correcto.");
       continue;
     }
 
-    // Se abre la lista y se busca una opción con ese texto exacto.
     let elegida = false;
+    let abierta = false;
     try {
       el.click();
+      abierta = true;
       await new Promise((r) => setTimeout(r, 350));
       const opciones = [...document.querySelectorAll('[role="option"]')].filter((o) => {
         const r = o.getBoundingClientRect();
         return r.width > 0 || r.height > 0;
       });
+
+      if (!valor) {
+        // Una lista en la que casi toda opción lleva "(+NN)" es de países con
+        // su prefijo, y entonces el dato que toca es el país.
+        const conPrefijo = opciones.filter((o) =>
+          /\(\+\d/.test(o.innerText || o.textContent || "")
+        ).length;
+        if (opciones.length >= 3 && conPrefijo >= opciones.length * 0.7)
+          valor = ficha.pais;
+        if (!valor) {
+          el.click(); // no era esto: se cierra y se deja como estaba
+          continue;
+        }
+        if (actual.includes(valor.toLowerCase())) {
+          el.click();
+          resaltar(el, "#34d399", "Ya estaba en el valor correcto.");
+          continue;
+        }
+      }
+
       const buscada = valor.toLowerCase().trim();
-      const opcion = opciones.find(
-        (o) => (o.innerText || o.textContent || "").trim().toLowerCase() === buscada
-      );
+      const textoDe = (o) => (o.innerText || o.textContent || "").trim().toLowerCase();
+
+      // Igual que en los nativos: vale la exacta, o la ÚNICA que empiece por
+      // el dato seguida de algo que no sea letra. El desplegable de prefijo
+      // telefónico dice "Venezuela (+58)" y esa es la buena; si hubiera dos
+      // que empiezan igual, elegir una sería adivinar.
+      const exacta = opciones.find((o) => textoDe(o) === buscada);
+      const empiezanIgual = opciones.filter((o) => {
+        const t = textoDe(o);
+        return t.startsWith(buscada) && !/[a-zà-ÿ]/.test(t.charAt(buscada.length));
+      });
+      const opcion = exacta ?? (empiezanIgual.length === 1 ? empiezanIgual[0] : undefined);
       if (opcion) {
         opcion.click();
         await new Promise((r) => setTimeout(r, 200));
@@ -393,7 +473,16 @@ async function rellenarFormulario(ficha) {
       }
     } catch {
       // Un componente que no responde al clic no es un error: se marca y ya.
+      if (abierta) {
+        try {
+          el.click();
+        } catch {
+          // Si tampoco se puede cerrar, se deja abierto: no merece más.
+        }
+      }
     }
+
+    if (!valor) continue;
 
     if (elegida) {
       resaltar(el, "#fbbf24", `Elegido "${valor}". Compruébalo antes de enviar.`);

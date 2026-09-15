@@ -94,14 +94,42 @@ test("corrige el país preseleccionado por el portal", async () => {
   assert.match(nota("#c"), /se cambió/i, "un cambio así tiene que avisarse");
 });
 
-test("no pisa una selección con una coincidencia solo aproximada", async () => {
+test("acepta la opción adornada cuando es la única que empieza igual", async () => {
+  // "Venezuela (Bolivariana)" es Venezuela, y es la única que empieza así.
+  // Dejarla sin elegir por no ser idéntica era demasiado conservador.
   const w = montar(`<form>
     <label for="c">País</label>
     <select id="c"><option value="a">Argentina</option><option value="b">Venezuela (Bolivariana)</option></select>
   </form>`);
   await w.rellenarFormulario(FICHA);
-  assert.equal(val("#c"), "a", "sin coincidencia exacta se deja lo que había");
+  assert.equal(val("#c"), "b");
+});
+
+test("con dos opciones que empiezan igual no elige ninguna", async () => {
+  // "Virgin Islands (British)" y "Virgin Islands (USA)" son países distintos.
+  // Elegir una sería adivinar, y el error se enviaría sin que nadie lo mire.
+  const w = montar(`<form>
+    <label for="c">País</label>
+    <select id="c">
+      <option value="x">Otro</option>
+      <option value="b">Venezuela (Bolivariana)</option>
+      <option value="o">Venezuela Occidental</option>
+    </select>
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#c"), "x", "ante dos candidatas se deja lo que había");
   assert.match(nota("#c"), /puede venir puesta por el portal/i);
+});
+
+test("la coincidencia parcial no vale a mitad de palabra", async () => {
+  // "Venezuelano" no es "Venezuela": el adorno tiene que empezar después de
+  // la palabra completa, no continuarla.
+  const w = montar(`<form>
+    <label for="c">País</label>
+    <select id="c"><option value="x">Otro</option><option value="n">Venezuelandia</option></select>
+  </form>`);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(val("#c"), "x");
 });
 
 test("con la opción vacía delante sí vale una coincidencia aproximada", async () => {

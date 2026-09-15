@@ -215,7 +215,22 @@ export function validarPerfilPegado(entrada: string): ResultadoImport {
     email: txt(p.email),
     telefono: txt(p.telefono),
     ubicacion: txt(p.ubicacion),
-    codigoPostal: txt(p.codigoPostal) || undefined,
+    nombrePila: txt(p.nombrePila) || undefined,
+    segundoNombre: txt(p.segundoNombre) || undefined,
+    apellidos: txt(p.apellidos) || undefined,
+    direccionPostal: (() => {
+      const d = esObj(p.direccionPostal) ? p.direccionPostal : {};
+      const dir = {
+        calle: txt(d.calle) || undefined,
+        ciudad: txt(d.ciudad) || undefined,
+        provincia: txt(d.provincia) || undefined,
+        // El código postal vivía suelto en el perfil: se sigue aceptando ahí
+        // por si la IA lo pone donde lo veía antes.
+        codigoPostal: txt(d.codigoPostal) || txt(p.codigoPostal) || undefined,
+        pais: txt(d.pais) || undefined,
+      };
+      return Object.values(dir).some(Boolean) ? dir : undefined;
+    })(),
     // Un input date solo entiende AAAA-MM-DD. Cualquier otro formato se
     // descarta en lugar de guardarse a medias: un campo de fecha con basura
     // dentro no se puede ni corregir a mano sin borrarlo antes.

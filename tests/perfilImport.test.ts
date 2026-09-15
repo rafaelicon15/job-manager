@@ -97,14 +97,46 @@ test("usa las líneas rojas por defecto si no vienen", () => {
   assert.ok(r.perfil!.lineasRojas.length > 0, "nunca se queda sin límites");
 });
 
-test("lleva el código postal y la fecha de nacimiento al perfil", () => {
+test("lleva la dirección postal y la fecha de nacimiento al perfil", () => {
   // Se añadieron al modelo pero no al importador, así que cargar un perfil
   // desde una IA los perdía en silencio.
   const r = validarPerfilPegado(
-    JSON.stringify({ ...minimo, codigoPostal: "46001", fechaNacimiento: "1988-03-02" })
+    JSON.stringify({
+      ...minimo,
+      fechaNacimiento: "1988-03-02",
+      direccionPostal: {
+        calle: "Av. Bolívar 123",
+        ciudad: "Villa de Cura",
+        provincia: "Aragua",
+        codigoPostal: "2126",
+        pais: "Venezuela",
+      },
+    })
   );
-  assert.equal(r.perfil?.codigoPostal, "46001");
+  assert.equal(r.perfil?.direccionPostal?.calle, "Av. Bolívar 123");
+  assert.equal(r.perfil?.direccionPostal?.ciudad, "Villa de Cura");
+  assert.equal(r.perfil?.direccionPostal?.codigoPostal, "2126");
   assert.equal(r.perfil?.fechaNacimiento, "1988-03-02");
+});
+
+test("acepta el código postal donde vivía antes, suelto en el perfil", () => {
+  // Una IA que vea un perfil exportado con la forma anterior lo pondrá ahí.
+  const r = validarPerfilPegado(JSON.stringify({ ...minimo, codigoPostal: "46001" }));
+  assert.equal(r.perfil?.direccionPostal?.codigoPostal, "46001");
+});
+
+test("lleva el nombre partido cuando viene", () => {
+  const r = validarPerfilPegado(
+    JSON.stringify({
+      ...minimo,
+      nombrePila: "Ana",
+      segundoNombre: "Beatriz",
+      apellidos: "Torres Gil",
+    })
+  );
+  assert.equal(r.perfil?.nombrePila, "Ana");
+  assert.equal(r.perfil?.segundoNombre, "Beatriz");
+  assert.equal(r.perfil?.apellidos, "Torres Gil");
 });
 
 test("descarta una fecha con formato equivocado y lo avisa", () => {
@@ -120,6 +152,7 @@ test("descarta una fecha con formato equivocado y lo avisa", () => {
 test("sin esos campos el perfil sigue siendo válido", () => {
   const r = validarPerfilPegado(JSON.stringify(minimo));
   assert.ok(r.ok);
-  assert.equal(r.perfil?.codigoPostal, undefined);
+  assert.equal(r.perfil?.direccionPostal, undefined, "sin datos no se crea el bloque vacío");
   assert.equal(r.perfil?.fechaNacimiento, undefined);
+  assert.equal(r.perfil?.nombrePila, undefined);
 });

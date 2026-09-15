@@ -96,11 +96,26 @@ test("corrige un país preseleccionado por el portal", async () => {
   assert.equal(textoCombo(), "Venezuela");
 });
 
-test("no elige nada si ninguna opción coincide exactamente", async () => {
-  const w = montarCombo("País", ["Venezuela (Bolivariana)", "Colombia"]);
+test("elige la opción adornada si es la única que empieza igual", async () => {
+  // El desplegable de prefijo telefónico dice "Venezuela (+58)", y el de país
+  // a veces "Venezuela (Bolivariana)". Las dos son Venezuela.
+  const w = montarCombo("Code", ["Uruguay (+598)", "Venezuela (+58)", "Vietnam (+84)"]);
+  await w.rellenarFormulario(FICHA);
+  assert.equal(textoCombo(), "Venezuela (+58)");
+});
+
+test("con dos opciones que empiezan igual no elige ninguna", async () => {
+  const w = montarCombo("País", ["Venezuela (Bolivariana)", "Venezuela Occidental"]);
   const r = await w.rellenarFormulario(FICHA);
-  assert.equal(textoCombo(), "Selecciona…", "elegir la que más se parece es justo lo que no debe hacer");
+  assert.equal(textoCombo(), "Selecciona…", "elegir entre dos candidatas es adivinar");
   assert.match(notaCombo(), /Elige "Venezuela"/, "pero sí dice cuál elegir");
+  assert.ok(r.pendientes > 0);
+});
+
+test("no elige nada si ninguna opción se parece", async () => {
+  const w = montarCombo("País", ["Colombia", "Perú"]);
+  const r = await w.rellenarFormulario(FICHA);
+  assert.equal(textoCombo(), "Selecciona…");
   assert.ok(r.pendientes > 0);
 });
 

@@ -150,9 +150,11 @@ test("el esquema del prompt del perfil es JSON válido", () => {
 
   for (const clave of [
     "nombre",
+    "nombrePila",
+    "apellidos",
     "email",
     "ubicacion",
-    "codigoPostal",
+    "direccionPostal",
     "fechaNacimiento",
     "experiencias",
     "habilidades",
@@ -160,6 +162,12 @@ test("el esquema del prompt del perfil es JSON válido", () => {
     "lineasRojas",
   ])
     assert.ok(clave in o, `falta "${clave}" en el esquema`);
+
+  // La dirección postal es un bloque, no campos sueltos: si se aplana, el
+  // importador deja de reconocerla.
+  const dir = o.direccionPostal as Record<string, unknown>;
+  for (const clave of ["calle", "ciudad", "provincia", "codigoPostal", "pais"])
+    assert.ok(clave in dir, `falta "${clave}" dentro de direccionPostal`);
 });
 
 test("los campos de contacto no se cuelan dentro de las experiencias", () => {

@@ -54,15 +54,42 @@ export interface RasgoPsicometrico {
   implicaciones: string[];
 }
 
+/**
+ * Dirección postal, que casi nunca coincide con la ubicación profesional.
+ *
+ * `ubicacion` dice dónde trabajas y sale en el CV ("Maracay, Aragua,
+ * Venezuela"). Esto es a dónde te mandan las cosas, que puede ser otra ciudad
+ * y otro código postal. Solo se usa para rellenar formularios: no aparece en
+ * ningún documento generado.
+ */
+export interface DireccionPostal {
+  calle?: string;
+  ciudad?: string;
+  provincia?: string;
+  codigoPostal?: string;
+  pais?: string;
+}
+
 export interface PerfilMaestro {
   nombre: string;
+  /**
+   * Cómo se parte el nombre cuando un formulario lo pide por trozos.
+   *
+   * No se deduce de `nombre`: "Ana B. Torres" partido por espacios da
+   * "Ana B." de nombre, y de la inicial "B." no hay forma de sacar
+   * "Beatriz". En los nombres hispanos con dos apellidos el reparto tampoco
+   * es evidente. Si están vacíos se parte lo mejor posible, pero rellenarlos
+   * evita el problema.
+   */
+  nombrePila?: string;
+  segundoNombre?: string;
+  apellidos?: string;
   titular: string;
   titularEn: string;
   email: string;
   telefono: string;
   ubicacion: string;
-  /** Código postal. Lo piden muchos formularios y no se deduce de la ciudad. */
-  codigoPostal?: string;
+  direccionPostal?: DireccionPostal;
   /** Fecha de nacimiento en AAAA-MM-DD, que es lo que espera un input date. */
   fechaNacimiento?: string;
   links: { etiqueta: string; url: string }[];

@@ -146,9 +146,18 @@ function leerFicha() {
   const p = estado?.perfil;
   if (!p?.nombre) return { error: "No hay perfil cargado en esta app." };
 
-  const nombres = p.nombre.trim().split(/\s+/);
   const enlace = (patron) =>
     (p.links || []).find((l) => patron.test(l.etiqueta || "") || patron.test(l.url || ""))?.url || "";
+
+  // El nombre partido se toma del perfil si está. Partirlo por espacios es un
+  // último recurso: "Ana B. Torres" da "Ana B." de nombre de pila, y de
+  // la inicial no hay forma de sacar el segundo nombre.
+  const trozos = p.nombre.trim().split(/\s+/);
+  const nombrePila =
+    p.nombrePila || trozos.slice(0, trozos.length > 2 ? 2 : 1).join(" ");
+  const apellidos =
+    p.apellidos ||
+    (trozos.length > 2 ? trozos.slice(2).join(" ") : trozos.slice(1).join(" "));
 
   // "Maracay, Aragua, Venezuela" son ciudad, estado y país, en ese orden.
   // Antes se tomaba el primero como ciudad y TODO lo demás como país, así que
@@ -158,22 +167,28 @@ function leerFicha() {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
-  const ciudad = lugar[0] ?? "";
-  const pais = lugar.length > 1 ? lugar[lugar.length - 1] : "";
-  const provincia = lugar.length > 2 ? lugar.slice(1, -1).join(", ") : "";
+
+  // La dirección postal manda sobre la ubicación profesional: el formulario
+  // pregunta a dónde te mandan las cosas, no dónde trabajas.
+  const d = p.direccionPostal || {};
+  const ciudad = d.ciudad || lugar[0] || "";
+  const pais = d.pais || (lugar.length > 1 ? lugar[lugar.length - 1] : "");
+  const provincia =
+    d.provincia || (lugar.length > 2 ? lugar.slice(1, -1).join(", ") : "");
 
   return {
     ficha: {
       nombre: p.nombre,
-      nombrePila: nombres.slice(0, nombres.length > 2 ? 2 : 1).join(" "),
-      apellidos:
-        nombres.length > 2 ? nombres.slice(2).join(" ") : nombres.slice(1).join(" "),
+      nombrePila,
+      segundoNombre: p.segundoNombre || "",
+      apellidos,
       email: p.email || "",
       telefono: p.telefono || "",
+      calle: d.calle || "",
       ciudad,
       provincia,
       pais,
-      codigoPostal: p.codigoPostal || "",
+      codigoPostal: d.codigoPostal || "",
       fechaNacimiento: p.fechaNacimiento || "",
       titular: p.titular || "",
       resumen: p.resumen || "",

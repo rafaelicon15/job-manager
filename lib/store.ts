@@ -16,6 +16,25 @@ import { ESTADO_INICIAL } from "./seed";
 
 const CLAVE = "rjm:estado:v1";
 
+/**
+ * Mueve los datos de un perfil guardado con una forma anterior a la actual.
+ *
+ * El código postal vivía suelto en el perfil; ahora pertenece a la dirección
+ * postal, junto a la calle y la ciudad de envío. Sin este traslado, quien ya lo
+ * tenía puesto lo vería desaparecer del formulario sin explicación.
+ */
+function migrarPerfil(p: PerfilMaestro & { codigoPostal?: string }): PerfilMaestro {
+  if (!p.codigoPostal) return p;
+  const { codigoPostal, ...resto } = p;
+  return {
+    ...resto,
+    direccionPostal: {
+      ...(p.direccionPostal ?? {}),
+      codigoPostal: p.direccionPostal?.codigoPostal || codigoPostal,
+    },
+  };
+}
+
 /** Fusiona el estado guardado con el inicial para que campos nuevos no rompan datos viejos. */
 function hidratar(crudo: string | null): EstadoApp {
   if (!crudo) return ESTADO_INICIAL;
@@ -23,7 +42,7 @@ function hidratar(crudo: string | null): EstadoApp {
     const guardado = JSON.parse(crudo) as Partial<EstadoApp>;
     return {
       version: ESTADO_INICIAL.version,
-      perfil: { ...ESTADO_INICIAL.perfil, ...(guardado.perfil ?? {}) },
+      perfil: migrarPerfil({ ...ESTADO_INICIAL.perfil, ...(guardado.perfil ?? {}) }),
       // Los campos nuevos se rellenan al leer: un estado guardado antes de
       // que existieran los adjuntos traeria `undefined` y el primer .map()
       // sobre el reventaria la app al abrirla.
