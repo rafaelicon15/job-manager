@@ -23,6 +23,8 @@ import {
   promptCarta,
   promptEntrevista,
   promptReunion,
+  promptSeguimiento,
+  promptCoherencia,
   promptDocumento,
 } from "./prompts";
 
@@ -934,6 +936,39 @@ const esquemaReunion = {
   ],
 };
 
+const esquemaSeguimiento = {
+  type: S.OBJECT,
+  properties: {
+    asunto: { type: S.STRING },
+    mensaje: { type: S.STRING },
+    porQue: { type: S.STRING },
+    siNoContestan: { type: S.STRING },
+  },
+  required: ["asunto", "mensaje", "porQue", "siNoContestan"],
+};
+
+const esquemaCoherencia = {
+  type: S.OBJECT,
+  properties: {
+    contradicciones: {
+      type: S.ARRAY,
+      items: {
+        type: S.OBJECT,
+        properties: {
+          asunto: { type: S.STRING },
+          dijiste: listaTexto,
+          porQueImporta: { type: S.STRING },
+          queHacer: { type: S.STRING },
+        },
+        required: ["asunto", "dijiste", "porQueImporta", "queHacer"],
+      },
+    },
+    riesgoAlto: listaTexto,
+    limpio: { type: S.BOOLEAN },
+  },
+  required: ["contradicciones", "riesgoAlto", "limpio"],
+};
+
 const esquemaDocumento = {
   type: Type.OBJECT,
   properties: {
@@ -990,6 +1025,61 @@ const esquemaDocumento = {
     "preguntasQueHacer",
   ],
 };
+
+export interface SeguimientoGenerado {
+  asunto: string;
+  mensaje: string;
+  porQue: string;
+  siNoContestan: string;
+}
+
+export interface Contradiccion {
+  asunto: string;
+  /** Las dos versiones enfrentadas, con el sitio donde se dijo cada una. */
+  dijiste: string[];
+  porQueImporta: string;
+  queHacer: string;
+}
+
+export interface RevisionCoherencia {
+  contradicciones: Contradiccion[];
+  riesgoAlto: string[];
+  limpio: boolean;
+}
+
+/** El mensaje para mover un proceso que lleva días callado. */
+export function redactarSeguimiento(
+  apiKey: string,
+  modelo: string,
+  perfil: PerfilMaestro,
+  vacante: Vacante,
+  dias: number,
+  toquesPrevios: number,
+  ultimoContacto: string,
+  idioma: Idioma
+) {
+  return generarJSON<SeguimientoGenerado>(
+    apiKey,
+    modelo,
+    promptSeguimiento(perfil, vacante, dias, toquesPrevios, ultimoContacto, idioma),
+    esquemaSeguimiento
+  );
+}
+
+/** Contradicciones entre lo dicho en procesos distintos. */
+export function revisarCoherencia(
+  apiKey: string,
+  modelo: string,
+  perfil: PerfilMaestro,
+  dichos: { donde: string; cuando: string; texto: string }[]
+) {
+  return generarJSON<RevisionCoherencia>(
+    apiKey,
+    modelo,
+    promptCoherencia(perfil, dichos),
+    esquemaCoherencia
+  );
+}
 
 /**
  * Convierte los apuntes de una reunión en un resumen utilizable.

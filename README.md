@@ -60,6 +60,7 @@ tres necesitan claves gratuitas y añaden España, México y Venezuela: ver
 | **Analizar** | Puntúa el encaje, desglosa requisito por requisito qué cubres y qué no, y te da cómo responder si preguntan por lo que falta |
 | **CV a medida** | PDF con capa de texto real, una columna, sin tablas ni imágenes — legible por los filtros automáticos |
 | **Carta y mensajes** | Carta de presentación y mensaje de contacto, en español o inglés |
+| **Revisión** | Qué se está enfriando, qué no está funcionando, dónde te has contradicho entre procesos y qué ofertas tienes encima de la mesa, todas en la misma moneda |
 | **Conversaciones** | Pega un hilo de LinkedIn, correo o WhatsApp y lo estructura. Detecta lo que prometiste y tu perfil no respalda |
 | **Entrevista** | Preguntas probables con tu respuesta preparada, y las que conviene hacer tú |
 | **Reuniones** | Cada llamada resumida, con los documentos que mandaron convertidos a Markdown: qué prometió cada parte, qué condiciones salieron y el seguimiento listo para mandar |

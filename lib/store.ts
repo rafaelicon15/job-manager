@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   Ajustes,
+  BusquedaGuardada,
   Conversacion,
   DocumentoGenerado,
   EstadoApp,
   EstadoVacante,
   Mensaje,
+  OfertaRecibida,
   PerfilMaestro,
   Reunion,
   Vacante,
@@ -52,6 +54,7 @@ function hidratar(crudo: string | null): EstadoApp {
         documentos: v.documentos ?? [],
         notas: v.notas ?? [],
         adjuntos: v.adjuntos ?? [],
+        toques: v.toques ?? [],
         reuniones: (v.reuniones ?? []).map((r) => ({
           ...r,
           materiales: r.materiales ?? [],
@@ -68,6 +71,7 @@ function hidratar(crudo: string | null): EstadoApp {
         incoherencias: c.incoherencias ?? [],
         adjuntos: c.adjuntos ?? [],
       })),
+      busquedas: (guardado.busquedas ?? []).map((b) => ({ ...b, vistas: b.vistas ?? [] })),
       ajustes: { ...ESTADO_INICIAL.ajustes, ...(guardado.ajustes ?? {}) },
     };
   } catch {
@@ -119,7 +123,7 @@ export function useEstado() {
   }, []);
 
   const agregarVacante = useCallback(
-    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "adjuntos" | "reuniones" | "favorito" | "estado"> &
+    (v: Omit<Vacante, "id" | "creadaEn" | "actualizadaEn" | "documentos" | "notas" | "adjuntos" | "reuniones" | "toques" | "favorito" | "estado"> &
       Partial<Pick<Vacante, "estado" | "favorito">>) => {
       const ahora = new Date().toISOString();
       const vacante: Vacante = {
@@ -132,6 +136,7 @@ export function useEstado() {
         notas: [],
         adjuntos: [],
         reuniones: [],
+        toques: [],
         ...v,
       } as Vacante;
       setEstado((s) => ({ ...s, vacantes: [vacante, ...s.vacantes] }));
@@ -214,6 +219,85 @@ export function useEstado() {
           ? { ...v, documentos: v.documentos.filter((d) => d.id !== idDoc) }
           : v
       ),
+    }));
+  }, []);
+
+  // ------------------------------------------------- seguimiento y ofertas
+
+  /**
+   * Apunta que hoy diste un toque en un proceso que estaba callado.
+   *
+   * Se guarda la fecha y no un booleano porque el radar necesita saber CUÁNDOS
+   * y CUÁNTAS veces: dos toques sin respuesta y tres semanas de silencio no son
+   * un proceso lento, son un no que nadie escribió.
+   */
+  const registrarToque = useCallback((idVacante: string, cuando = new Date().toISOString()) => {
+    setEstado((s) => ({
+      ...s,
+      vacantes: s.vacantes.map((v) =>
+        v.id === idVacante
+          ? { ...v, toques: [...(v.toques ?? []), cuando], actualizadaEn: new Date().toISOString() }
+          : v
+      ),
+    }));
+  }, []);
+
+  const guardarOferta = useCallback(
+    (idVacante: string, oferta: OfertaRecibida | undefined) => {
+      setEstado((s) => ({
+        ...s,
+        vacantes: s.vacantes.map((v) =>
+          v.id === idVacante
+            ? { ...v, oferta, actualizadaEn: new Date().toISOString() }
+            : v
+        ),
+      }));
+    },
+    []
+  );
+
+  // --------------------------------------------------- búsquedas guardadas
+
+  /** Cuántas huellas se conservan por búsqueda antes de podar las viejas. */
+  const TOPE_VISTAS = 400;
+
+  const guardarBusqueda = useCallback(
+    (b: Omit<BusquedaGuardada, "id" | "creadaEn" | "vistas">) => {
+      const busqueda: BusquedaGuardada = {
+        ...b,
+        id: nuevoId("bus"),
+        vistas: [],
+        creadaEn: new Date().toISOString(),
+      };
+      setEstado((s) => ({ ...s, busquedas: [busqueda, ...s.busquedas] }));
+      return busqueda;
+    },
+    []
+  );
+
+  const borrarBusqueda = useCallback((id: string) => {
+    setEstado((s) => ({ ...s, busquedas: s.busquedas.filter((b) => b.id !== id) }));
+  }, []);
+
+  /**
+   * Marca como vistas las ofertas que acaba de enseñar una búsqueda.
+   *
+   * La lista se poda por el final: sin tope, una búsqueda semanal acaba
+   * guardando miles de huellas y se come el hueco de localStorage que necesitan
+   * las vacantes y las conversaciones.
+   */
+  const marcarVistas = useCallback((id: string, claves: string[]) => {
+    setEstado((s) => ({
+      ...s,
+      busquedas: s.busquedas.map((b) => {
+        if (b.id !== id) return b;
+        const juntas = [...new Set([...claves, ...b.vistas])];
+        return {
+          ...b,
+          vistas: juntas.slice(0, TOPE_VISTAS),
+          ultimaEjecucion: new Date().toISOString(),
+        };
+      }),
     }));
   }, []);
 
@@ -419,6 +503,11 @@ export function useEstado() {
     agregarReunion,
     actualizarReunion,
     borrarReunion,
+    registrarToque,
+    guardarOferta,
+    guardarBusqueda,
+    borrarBusqueda,
+    marcarVistas,
     agregarConversacion,
     actualizarConversacion,
     borrarConversacion,

@@ -718,6 +718,113 @@ Si un dato sale de un documento y no de la llamada, dilo entre paréntesis con e
 }
 
 /**
+ * El toque a un proceso que lleva días callado.
+ *
+ * Aquí la tentación es escribir un correo de tres párrafos recordando lo
+ * maravilloso que eres. Eso es exactamente lo que hace que no te contesten. Un
+ * toque que funciona es corto, da una razón para escribir hoy que no sea "sigo
+ * esperando", y deja una salida fácil a quien lo lee, porque muchas veces el
+ * reclutador no contesta precisamente porque no tiene noticias que dar.
+ */
+export function promptSeguimiento(
+  p: PerfilMaestro,
+  v: Vacante,
+  dias: number,
+  toquesPrevios: number,
+  ultimoContacto: string,
+  idioma: Idioma
+): string {
+  const lang = idioma === "en" ? "inglés" : "español";
+  const esUltimo = toquesPrevios >= 1;
+
+  return `Eres quien redacta los seguimientos de ${p.nombre}. Hay un proceso parado y hay que escribir el mensaje que lo mueva, o que lo cierre con dignidad.
+
+${perfilComoTexto(p)}
+
+${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
+
+EL PROCESO
+  Puesto: ${v.titulo} — ${v.empresa}
+  Estado: ${v.estado}
+  ${ultimoContacto}, hace ${dias} días.
+  Toques de seguimiento ya dados sin respuesta: ${toquesPrevios}
+${v.analisis ? `  Ángulo que estabas vendiendo: ${v.analisis.anguloRecomendado}` : ""}
+${v.contacto?.nombre ? `  Contacto: ${v.contacto.nombre}${v.contacto.cargo ? `, ${v.contacto.cargo}` : ""}` : "  Sin contacto con nombre: escribe sin nombre propio."}
+
+${historialReuniones(v.reuniones)}
+
+Escribe en ${lang}. Devuelve el JSON pedido:
+
+- asunto: la línea de asunto si esto va por correo. Concreta y sin "seguimiento" a secas. Máximo 8 palabras.
+
+- mensaje: el seguimiento listo para enviar. Entre 45 y 90 palabras, ni una más. Tiene que:
+  * Dar una razón para escribir HOY que no sea que estás esperando. Vale un dato nuevo sobre ti que encaje con el puesto, algo publicado por la empresa, o retomar una pregunta concreta que quedó abierta en el proceso.
+  * Citar algo concreto de lo que ya se habló, si hubo reuniones o mensajes. Si no hubo nada, citar algo concreto de la oferta.
+  * Dejarle una salida fácil: que pueda contestar en una línea, incluso para decir que no.
+  * Nada de disculpas por escribir, nada de "sé que estáis muy ocupados", nada de repetir tu candidatura entera.
+${
+  esUltimo
+    ? `  * Este es el ÚLTIMO toque: ya diste ${toquesPrevios}. Ciérralo. Di, sin reproche y sin drama, que entiendes que el proceso haya seguido otro camino y que quedas disponible si cambia. Esto no es una queja: es la forma de que te tengan en cuenta la próxima vez.`
+    : ""
+}
+
+- porQue: en una frase, qué hace que este mensaje tenga alguna posibilidad de que lo contesten. Es para él, no se envía.
+
+- siNoContestan: qué hacer si esto tampoco recibe respuesta, en una frase concreta con plazo.
+
+No inventes novedades sobre él que el perfil no respalde, ni te inventes noticias de la empresa. Si no hay ninguna razón nueva y honesta para escribir, dilo en porQue y escribe el mensaje más corto y más digno que puedas.`;
+}
+
+/**
+ * Busca contradicciones entre procesos distintos.
+ *
+ * El motor ya vigila la coherencia dentro de un hilo y dentro de una reunión.
+ * Lo que nadie vigila es lo que pasa entre procesos: a una empresa le dices que
+ * tu disponibilidad es inmediata y a otra que necesitas treinta días; en un
+ * sitio hablas de tres años con una herramienta y en otro de cinco. Eso no lo
+ * descubre nadie hasta que dos reclutadores del mismo sector hablan entre
+ * ellos, y entonces ya no hay arreglo.
+ */
+export function promptCoherencia(
+  p: PerfilMaestro,
+  dichos: { donde: string; cuando: string; texto: string }[]
+): string {
+  const bloques = dichos
+    .map((d) => `  [${d.donde} · ${d.cuando}]\n  "${d.texto.slice(0, 1200)}"`)
+    .join("\n\n");
+
+  return `Eres el revisor de ${p.nombre}. Tu único trabajo es encontrar dónde se ha contradicho a sí mismo entre procesos de selección distintos, y dónde ha dicho algo que su perfil maestro no respalda.
+
+${perfilComoTexto(p)}
+
+${reglasDeHonestidad(p)}
+
+${reglasDeEstilo()}
+
+LO QUE HA DICHO, CON DÓNDE Y CUÁNDO (${dichos.length} fragmentos)
+${bloques}
+
+Devuelve el JSON pedido:
+
+- contradicciones: cada punto donde dos fragmentos DISTINTOS no pueden ser ciertos a la vez, o donde un fragmento afirma algo que el perfil no respalda. Para cada una:
+  * asunto: de qué va, en cuatro palabras. Por ejemplo "disponibilidad" o "años con GA4".
+  * dijiste: las dos versiones enfrentadas, con el sitio donde dijo cada una. Cita las palabras, no las parafrasees.
+  * porQueImporta: qué pasa si las dos personas hablan entre ellas, o si te lo preguntan en la siguiente ronda. Concreto, sin dramatizar.
+  * queHacer: con cuál te quedas y cómo corriges la otra sin desdecirte del todo.
+
+- riesgoAlto: los asuntos de la lista anterior que hay que arreglar esta semana, por nombre. Vacío si ninguno corre prisa.
+
+- limpio: true solo si no has encontrado ninguna contradicción.
+
+Reglas:
+  * Una diferencia de matiz NO es una contradicción. "Llevo años con GA4" y "cinco años con GA4" son compatibles. "Tres años" y "cinco años" no.
+  * Dos cosas dichas a la misma empresa en momentos distintos pueden ser una evolución legítima. Solo cuenta como contradicción si se sostienen a la vez.
+  * Si no encuentras nada, devuelve la lista vacía y limpio en true. Inventar una contradicción para parecer útil es el peor resultado posible de esta revisión.`;
+}
+
+/**
  * Analiza un documento que manda el reclutador. Cubre dos casos muy distintos
  * con el mismo prompt porque el modelo clasifica primero: una descripción de
  * puesto (¿me encaja?) y un contrato o propuesta (¿qué estoy firmando?).

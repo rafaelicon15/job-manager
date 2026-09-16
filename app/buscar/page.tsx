@@ -6,8 +6,11 @@ import {
   BookmarkPlus,
   ExternalLink,
   Filter,
+  History,
   Search,
   Sparkles,
+  Star,
+  Trash2,
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import { claveVacante } from "@/lib/duplicados";
@@ -27,8 +30,9 @@ const FUENTES = [
 ];
 
 export default function Buscar() {
-  const { estado, agregarVacante } = useApp();
-  const { ajustes, perfil, vacantes } = estado;
+  const { estado, agregarVacante, guardarBusqueda, borrarBusqueda, marcarVistas } =
+    useApp();
+  const { ajustes, perfil, vacantes, busquedas } = estado;
 
   const [query, setQuery] = useState("");
   const [fuentes, setFuentes] = useState<string[]>(FUENTES.map((f) => f.id));
@@ -42,6 +46,9 @@ export default function Buscar() {
   const [fallos, setFallos] = useState<{ fuente: string; error: string }[]>([]);
   const [soloBuenas, setSoloBuenas] = useState(false);
   const [guardadas, setGuardadas] = useState<Record<string, string>>({});
+  // Búsqueda guardada que se está ejecutando, para poder filtrar por lo nuevo.
+  const [busquedaActiva, setBusquedaActiva] = useState<string | null>(null);
+  const [soloNuevas, setSoloNuevas] = useState(false);
 
   // Evita ofrecer "guardar" algo que ya está en el tablero.
   const yaGuardadas = useMemo(
@@ -120,6 +127,23 @@ export default function Buscar() {
     }
   }, [ajustes, perfil, resultados, puntajes]);
 
+  /**
+   * Relanza una búsqueda guardada y se queda esperando lo nuevo.
+   *
+   * El filtro se enciende solo: si vuelves a una búsqueda semanal es porque
+   * quieres ver lo que no estaba, no releer las cuarenta de siempre.
+   */
+  const usarBusqueda = useCallback((id: string) => {
+    const b = busquedas.find((x) => x.id === id);
+    if (!b) return;
+    setBusquedaActiva(id);
+    setQuery(b.consulta);
+    setFuentes(b.fuentes.length ? b.fuentes : FUENTES.map((f) => f.id));
+    setSoloNuevas(b.vistas.length > 0);
+    setResultados([]);
+    setPuntajes({});
+  }, [busquedas]);
+
   const guardar = (v: VacanteCruda) => {
     const nueva = agregarVacante({
       titulo: v.titulo,
@@ -134,14 +158,28 @@ export default function Buscar() {
     setGuardadas((g) => ({ ...g, [v.id]: nueva.id }));
   };
 
+  const activa = busquedas.find((b) => b.id === busquedaActiva);
+  /** Huellas que esta búsqueda guardada ya te enseñó otras veces. */
+  const yaVistas = useMemo(() => new Set(activa?.vistas ?? []), [activa]);
+
   const visibles = useMemo(() => {
-    const lista = soloBuenas
+    let lista = soloBuenas
       ? resultados.filter((v) => (puntajes[v.id]?.puntaje ?? 0) >= 60)
       : resultados;
+    if (soloNuevas && yaVistas.size)
+      lista = lista.filter((v) => !yaVistas.has(claveDe(v)));
     return [...lista].sort(
       (a, b) => (puntajes[b.id]?.puntaje ?? -1) - (puntajes[a.id]?.puntaje ?? -1)
     );
-  }, [resultados, puntajes, soloBuenas]);
+    // `claveDe` es estable porque solo depende de la función importada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultados, puntajes, soloBuenas, soloNuevas, yaVistas]);
+
+  const nuevas = useMemo(
+    () => (yaVistas.size ? resultados.filter((v) => !yaVistas.has(claveDe(v))).length : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resultados, yaVistas]
+  );
 
   const sinClavesAdzuna = !ajustes.adzunaAppId || !ajustes.adzunaAppKey;
 
@@ -231,6 +269,75 @@ export default function Buscar() {
         </div>
       </section>
 
+      {(busquedas.length > 0 || query.trim()) && (
+        <section className="panel p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <History size={15} /> Búsquedas guardadas
+            </h2>
+            {query.trim() && (
+              <button
+                className="btn py-1.5 text-xs"
+                onClick={() => {
+                  const b = guardarBusqueda({
+                    nombre: query.trim().slice(0, 60),
+                    consulta: query.trim(),
+                    fuentes,
+                  });
+                  setBusquedaActiva(b.id);
+                }}
+              >
+                <Star size={14} /> Guardar esta búsqueda
+              </button>
+            )}
+          </div>
+
+          {busquedas.length === 0 ? (
+            <p className="text-xs leading-relaxed text-[var(--color-suave)]">
+              Guarda la búsqueda que repites cada semana. Al relanzarla podrás
+              quedarte solo con lo que no estaba la vez anterior, en lugar de
+              releer cuarenta resultados de los que ya descartaste treinta y ocho.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {busquedas.map((b) => (
+                <li
+                  key={b.id}
+                  className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                    b.id === busquedaActiva
+                      ? "border-[var(--color-acento)]"
+                      : "border-[var(--color-borde)]"
+                  }`}
+                >
+                  <button
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => usarBusqueda(b.id)}
+                  >
+                    <span className="block truncate text-sm font-medium">{b.nombre}</span>
+                    <span className="block text-[11px] text-[var(--color-suave)]">
+                      {b.fuentes.length} fuentes
+                      {b.vistas.length > 0 && ` · ${b.vistas.length} ofertas ya vistas`}
+                      {b.ultimaEjecucion &&
+                        ` · última vez el ${new Date(b.ultimaEjecucion).toLocaleDateString("es")}`}
+                    </span>
+                  </button>
+                  <button
+                    className="btn px-2 py-1 text-rose-300"
+                    title="Borrar esta búsqueda"
+                    onClick={() => {
+                      borrarBusqueda(b.id);
+                      if (busquedaActiva === b.id) setBusquedaActiva(null);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {error && <Alerta tipo="error">{error}</Alerta>}
       {fallos.length > 0 && (
         <Alerta tipo="aviso">
@@ -255,6 +362,24 @@ export default function Buscar() {
               <Filter size={15} />
               {soloBuenas ? "Ver todas" : "Solo encaje ≥ 60"}
             </button>
+            {activa && yaVistas.size > 0 && (
+              <button className="btn" onClick={() => setSoloNuevas((s) => !s)}>
+                <History size={15} />
+                {soloNuevas ? `Ver las ${resultados.length}` : `Solo las ${nuevas} nuevas`}
+              </button>
+            )}
+            {activa && (
+              <button
+                className="btn"
+                title="Marca las de ahora como vistas, para que la próxima vez solo salga lo nuevo"
+                onClick={() => {
+                  marcarVistas(activa.id, resultados.map(claveDe));
+                  setSoloNuevas(false);
+                }}
+              >
+                Dar por revisadas
+              </button>
+            )}
             <button className="btn btn-primario" onClick={triar} disabled={triando}>
               <Sparkles size={15} className="icono-late" />
               {triando

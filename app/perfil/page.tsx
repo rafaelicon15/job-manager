@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
 import ImportarPerfil from "@/components/ImportarPerfil";
+import Referencias from "@/components/Referencias";
 import { nuevoId } from "@/lib/store";
 import { PERFIL_INICIAL } from "@/lib/seed";
 import type { Experiencia, Logro, PerfilMaestro } from "@/lib/types";
@@ -614,6 +615,10 @@ export default function Perfil() {
             })
           }
         />
+      </Bloque>
+
+      <Bloque titulo={`Referencias (${(p.referencias ?? []).length})`}>
+        <Referencias perfil={p} onCambio={(referencias) => set({ referencias })} />
       </Bloque>
 
       <Bloque titulo="Líneas rojas del motor">

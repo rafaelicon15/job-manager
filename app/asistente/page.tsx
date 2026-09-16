@@ -65,6 +65,7 @@ function vacanteGenerica(perfil: string): Vacante {
     notas: [],
     adjuntos: [],
     reuniones: [],
+    toques: [],
   };
 }
 

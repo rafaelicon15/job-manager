@@ -12,6 +12,7 @@ import {
   Radar,
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
+import { analizarSilencios } from "@/lib/silencios";
 import { ESTADOS } from "@/lib/types";
 import { Alerta, EsqueletoPanel, InsigniaEstado, Puntaje, Tarjeta, Vacio } from "@/components/ui";
 
@@ -66,6 +67,13 @@ export default function Panel() {
   );
 
   const hoy = new Date().toISOString().slice(0, 10);
+
+  // Procesos que llevan días sin señal. El panel solo cuenta; el detalle y el
+  // toque redactado viven en Revisión.
+  const callados = useMemo(
+    () => analizarSilencios(vacantes, estado.conversaciones).length,
+    [vacantes, estado.conversaciones]
+  );
 
   if (!listo) return <EsqueletoPanel />;
 
@@ -135,6 +143,14 @@ export default function Panel() {
           valor={esperandoRespuesta.length}
           acento={esperandoRespuesta.length ? "text-amber-300" : undefined}
         />
+        <Link href="/revision" className="block transition hover:opacity-80">
+          <Tarjeta
+            titulo="Procesos callados"
+            valor={callados}
+            detalle={callados ? "necesitan un toque" : "ninguno se está enfriando"}
+            acento={callados ? "text-rose-300" : undefined}
+          />
+        </Link>
         <Tarjeta
           titulo="En entrevista u oferta"
           valor={m.entrevistas}
@@ -143,7 +159,15 @@ export default function Panel() {
       </section>
 
       <section className="panel p-5">
-        <h2 className="mb-4 text-sm font-semibold">Embudo</h2>
+        <h2 className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+          <span>Embudo</span>
+          <Link
+            href="/revision"
+            className="text-xs font-normal text-[var(--color-acento)] underline"
+          >
+            Ver el diagnóstico completo
+          </Link>
+        </h2>
         <div className="flex flex-wrap gap-2">
           {ESTADOS.filter((e) => e.id !== "descartada").map((e) => {
             const n = vacantes.filter((v) => v.estado === e.id).length;

@@ -108,6 +108,8 @@ export interface PerfilMaestro {
   habilidades: HabilidadGrupo[];
   idiomas: { idioma: string; nivel: string }[];
   psicometria: RasgoPsicometrico[];
+  /** Gente que puede responder por ti, y qué puede confirmar cada una. */
+  referencias?: Referencia[];
   /** Límites que el motor NUNCA debe cruzar al redactar. */
   lineasRojas: string[];
   preferencias: {
@@ -118,6 +120,32 @@ export interface PerfilMaestro {
     rolesObjetivo: string[];
     keywordsBusqueda: string[];
   };
+}
+
+/**
+ * Alguien que puede responder por ti.
+ *
+ * `respalda` lleva ids de logros del perfil, igual que los puntos del CV. Es la
+ * misma regla de siempre: una referencia solo sirve para confirmar lo que de
+ * verdad vio, y apuntarlo evita mandar a un reclutador a preguntarle a alguien
+ * por un proyecto en el que no estuvo.
+ *
+ * `usos` existe porque una referencia se quema. Tres llamadas en dos meses a la
+ * misma persona y deja de coger el teléfono, así que conviene ver a quién le
+ * has dado su nombre y cuándo.
+ */
+export interface Referencia {
+  id: string;
+  nombre: string;
+  cargo?: string;
+  empresa?: string;
+  /** De qué la conoces: "fue mi responsable en …". */
+  relacion: string;
+  contacto?: string;
+  /** Ids de logros que esta persona vivió y puede confirmar. */
+  respalda: string[];
+  usos: { empresa: string; fecha: string; vacanteId?: string }[];
+  notas?: string;
 }
 
 export type EstadoVacante =
@@ -191,6 +219,10 @@ export interface Vacante {
   creadaEn: string;
   actualizadaEn: string;
   fechaPostulacion?: string;
+  /** Fechas ISO de cada toque de seguimiento dado sin respuesta. */
+  toques: string[];
+  /** Las condiciones de la oferta, cuando llega. */
+  oferta?: OfertaRecibida;
   proximaAccion?: { que: string; cuando: string };
   contacto?: { nombre?: string; cargo?: string; linkedin?: string; email?: string };
   analisis?: Analisis;
@@ -200,6 +232,38 @@ export interface Vacante {
   /** Material que manda el reclutador, ya analizado. */
   adjuntos: Adjunto[];
   notas: { id: string; texto: string; fecha: string }[];
+}
+
+export type Periodo = "hora" | "mes" | "anio";
+
+/**
+ * Las condiciones de una oferta, en cifras comparables.
+ *
+ * Se guarda el importe y su moneda por separado en vez de un texto libre
+ * porque el momento en que esto importa es cuando tienes dos ofertas encima de
+ * la mesa en monedas distintas y hay que decidir en dos días. "1.800 USD al
+ * mes" y "32.000 EUR en 14 pagas" no se comparan de cabeza.
+ */
+export interface OfertaRecibida {
+  base: number;
+  /** Código de tres letras: USD, EUR, VES. */
+  moneda: string;
+  periodo: Periodo;
+  /** Pagas al año cuando el periodo es mensual. España suele usar 14. */
+  pagas?: number;
+  /** Variable, bonos o comisiones, estimados al año y en la misma moneda. */
+  variable?: number;
+  /** Días de oficina por semana. */
+  diasOficina?: number;
+  /** Días de vacaciones al año. */
+  vacaciones?: number;
+  tipoContrato?: string;
+  /** Cuándo empezarías, en AAAA-MM-DD. */
+  inicio?: string;
+  /** Hasta cuándo tienes para contestar, en AAAA-MM-DD. */
+  fechaLimite?: string;
+  notas?: string;
+  recibidaEn: string;
 }
 
 export type Canal = "linkedin" | "email" | "whatsapp" | "otro";
@@ -419,6 +483,25 @@ export interface AnalisisDocumento {
   modelo: string;
 }
 
+/**
+ * Una búsqueda que repites cada semana.
+ *
+ * `vistas` guarda la huella de las ofertas que ya te enseñó, para que al
+ * relanzarla puedas quedarte solo con lo que no estaba. Es la diferencia entre
+ * revisar cuarenta resultados de los que treinta y ocho ya descartaste, y
+ * revisar dos.
+ */
+export interface BusquedaGuardada {
+  id: string;
+  nombre: string;
+  consulta: string;
+  fuentes: string[];
+  /** Huellas de las ofertas ya mostradas. Se poda para no crecer sin fin. */
+  vistas: string[];
+  ultimaEjecucion?: string;
+  creadaEn: string;
+}
+
 export interface Ajustes {
   geminiApiKey: string;
   modelo: string;
@@ -429,6 +512,17 @@ export interface Ajustes {
   careerjetKey: string;
   idiomaPorDefecto: Idioma;
   ultimoRespaldo?: string;
+  /** Moneda en la que quieres comparar las ofertas. */
+  monedaBase?: string;
+  /**
+   * Cuánto vale una unidad de cada moneda en la moneda base, puesto a mano.
+   *
+   * No se consulta ninguna API de divisas a propósito: sería otra dependencia
+   * que se cae, y para decidir entre dos ofertas la tasa del día que tú elijas
+   * es más honesta que una que cambia sola bajo tus pies.
+   */
+  tasas?: Record<string, number>;
+  tasasActualizadas?: string;
 }
 
 export interface EstadoApp {
@@ -436,5 +530,6 @@ export interface EstadoApp {
   perfil: PerfilMaestro;
   vacantes: Vacante[];
   conversaciones: Conversacion[];
+  busquedas: BusquedaGuardada[];
   ajustes: Ajustes;
 }

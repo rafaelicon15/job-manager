@@ -11,6 +11,7 @@ import {
   Mic,
   MessagesSquare,
   CalendarClock,
+  CalendarPlus,
   NotebookPen,
   Paperclip,
   Star,
@@ -28,6 +29,8 @@ import PanelEntrevista from "@/components/PanelEntrevista";
 import PanelReuniones from "@/components/PanelReuniones";
 import Adjuntos from "@/components/Adjuntos";
 import { nuevoId } from "@/lib/store";
+import { crearIcs, nombreIcs } from "@/lib/ics";
+import { descargarTexto } from "@/lib/descargar";
 
 type Pestana =
   | "analisis"
@@ -210,6 +213,23 @@ export default function FichaVacante({
                 })
               }
             />
+            <button
+              className="btn px-2 py-1.5 text-xs"
+              title="Llevarlo al calendario"
+              onClick={() =>
+                descargarTexto(
+                  nombreIcs(`${vacante.empresa} ${vacante.proximaAccion!.que}`),
+                  crearIcs({
+                    titulo: `${vacante.proximaAccion!.que} — ${vacante.empresa}`,
+                    inicio: vacante.proximaAccion!.cuando,
+                    descripcion: `${vacante.titulo} en ${vacante.empresa}.`,
+                  }),
+                  "text/calendar"
+                )
+              }
+            >
+              <CalendarPlus size={14} />
+            </button>
             <button
               className="btn py-1.5 text-xs"
               onClick={() => actualizarVacante(vacante.id, { proximaAccion: undefined })}

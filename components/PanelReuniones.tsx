@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   AlertTriangle,
   CalendarClock,
+  CalendarPlus,
   CheckCircle2,
   ChevronDown,
   Plus,
@@ -32,6 +33,8 @@ import {
   resumenComoTexto,
 } from "@/lib/reuniones";
 import MaterialesReunion, { type BytesSueltos } from "@/components/MaterialesReunion";
+import { crearIcs, nombreIcs } from "@/lib/ics";
+import { descargarTexto } from "@/lib/descargar";
 
 /**
  * Las reuniones que ya han pasado en este proceso, con su resumen.
@@ -235,6 +238,29 @@ export default function PanelReuniones({ vacante }: { vacante: Vacante }) {
                 >
                   <Sparkles size={14} />
                   {trabajando === r.id ? "Resumiendo…" : x ? "Regenerar" : "Resumir"}
+                </button>
+                <button
+                  className="btn px-2 py-1.5"
+                  title="Llevar esta reunión al calendario"
+                  disabled={!r.fecha}
+                  onClick={() =>
+                    descargarTexto(
+                      nombreIcs(`${etiquetaDeTipo(r.tipo)} ${vacante.empresa}`),
+                      crearIcs({
+                        titulo: `${etiquetaDeTipo(r.tipo)}: ${vacante.titulo} — ${vacante.empresa}`,
+                        inicio: r.fecha,
+                        duracionMin: r.duracionMin,
+                        lugar: r.canal,
+                        descripcion: r.participantes
+                          .map((q) => [q.nombre, q.cargo].filter(Boolean).join(", "))
+                          .join(" | "),
+                        avisoMin: 30,
+                      }),
+                      "text/calendar"
+                    )
+                  }
+                >
+                  <CalendarPlus size={14} />
                 </button>
                 <button
                   className="btn px-2 py-1.5 text-rose-300"

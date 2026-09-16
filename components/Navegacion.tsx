@@ -10,6 +10,7 @@ import {
   UserRound,
   MessagesSquare,
   Inbox,
+  Stethoscope,
   AlertTriangle,
 } from "lucide-react";
 import { useApp } from "@/lib/contexto";
@@ -19,6 +20,7 @@ const ENLACES = [
   { href: "/buscar", label: "Buscar vacantes", Icono: Radar },
   { href: "/vacantes", label: "Mis postulaciones", Icono: BriefcaseBusiness },
   { href: "/conversaciones", label: "Conversaciones", Icono: Inbox },
+  { href: "/revision", label: "Revisión", Icono: Stethoscope },
   { href: "/asistente", label: "Asistente", Icono: MessagesSquare },
   { href: "/perfil", label: "Perfil maestro", Icono: UserRound },
   { href: "/ajustes", label: "Ajustes", Icono: Settings },

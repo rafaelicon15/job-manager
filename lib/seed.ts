@@ -70,6 +70,11 @@ export const AJUSTES_INICIALES: Ajustes = {
   joobleKey: "",
   careerjetKey: "",
   idiomaPorDefecto: "es",
+  monedaBase: "USD",
+  // Las tasas de cambio las pones tú en el comparador de ofertas. No se
+  // consulta ninguna API de divisas a propósito: para una decisión que tomas
+  // hoy, la tasa que tú fijas hoy es más honesta que una que se mueve sola.
+  tasas: { USD: 1 },
 };
 
 export const ESTADO_INICIAL: EstadoApp = {
@@ -77,5 +82,6 @@ export const ESTADO_INICIAL: EstadoApp = {
   perfil: PERFIL_INICIAL,
   vacantes: [],
   conversaciones: [],
+  busquedas: [],
   ajustes: AJUSTES_INICIALES,
 };
