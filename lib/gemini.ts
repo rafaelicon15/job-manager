@@ -36,6 +36,39 @@ import {
  */
 export const MODELO_RESPALDO = "gemini-flash-lite-latest";
 
+/**
+ * Orden en el que se prueban los modelos cuando el elegido no responde.
+ *
+ * Antes solo había UN respaldo, y eso dejaba un agujero: el modelo por defecto
+ * de la app es justo ese respaldo, así que cuando Flash Lite se saturaba la
+ * cola se quedaba con un único modelo. La app reintentaba cinco veces contra el
+ * mismo sitio saturado y se rendía pidiéndole al usuario que cambiara de modelo
+ * a mano, que es exactamente lo que debería hacer ella sola.
+ *
+ * El orden sale de lo medido contra la API con una clave del plan gratuito:
+ * Flash Lite es el que más aguanta, Flash da mejor calidad pero se satura,
+ * la versión fija sirve cuando "latest" apunta a algo que está cayéndose, y Pro
+ * va al final porque es el más lento aunque no gaste cuota gratuita.
+ */
+export const CASCADA = [
+  "gemini-flash-lite-latest",
+  "gemini-flash-latest",
+  "gemini-3.8-flash",
+  "gemini-pro-latest",
+];
+
+/**
+ * Los modelos a probar, empezando por el que eligió el usuario.
+ *
+ * Se respeta su elección como primera opción y el resto entra por detrás sin
+ * repetirlo. Un modelo desconocido (guardado por una versión anterior) también
+ * vale como primera opción: si no existe, la cascada lo descubre y sigue.
+ */
+export function colaDeModelos(modelo: string): string[] {
+  const elegido = modelo.trim() || MODELO_RESPALDO;
+  return [elegido, ...CASCADA.filter((m) => m !== elegido)];
+}
+
 // Verificados contra la API con una clave del plan gratuito. Ojo al añadir:
 // que un modelo aparezca en /models NO garantiza que responda a generateContent
 // (gemini-2.5-flash sale listado y devuelve 404).
@@ -139,10 +172,17 @@ const MOTIVOS: Record<string, string> = {
 };
 
 const REINTENTOS = 4;
+/** En los modelos de respaldo se insiste menos: hay que bajar rápido. */
+const REINTENTOS_RESPALDO = 2;
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type Clase = "saturado" | "limitePorMinuto" | "cuotaDiaria" | "fatal";
+type Clase =
+  | "saturado"
+  | "limitePorMinuto"
+  | "cuotaDiaria"
+  | "modeloNoDisponible"
+  | "fatal";
 
 /**
  * Clasifica el fallo para decidir si reintentar y cuánto esperar. Medido contra
@@ -154,8 +194,12 @@ type Clase = "saturado" | "limitePorMinuto" | "cuotaDiaria" | "fatal";
  *    primera le daba al usuario un error duro por algo que dura segundos.
  *  - El 429 por cuota DIARIA sí es definitivo: insistir solo la quema.
  */
-function clasificar(e: unknown): Clase {
+export function clasificar(e: unknown): Clase {
   const msg = e instanceof Error ? e.message : String(e);
+  // Un modelo que no existe para esta clave no es un error del usuario: hay
+  // que pasar al siguiente de la cascada, no abortarlo todo.
+  if (/404|NOT_FOUND|is not found for API version|not supported for generateContent/i.test(msg))
+    return "modeloNoDisponible";
   if (/per ?day|PerDay|daily/i.test(msg) && /429|quota|RESOURCE_EXHAUSTED/i.test(msg))
     return "cuotaDiaria";
   if (/429|RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg)) return "limitePorMinuto";
@@ -208,20 +252,30 @@ export interface ArchivoInline {
   datos: string;
 }
 
-async function generarJSON<T>(
+/**
+ * El núcleo, que además dice QUÉ modelo acabó respondiendo.
+ *
+ * Hace falta porque con la cascada el modelo que contesta ya no es casi siempre
+ * el que eligió el usuario. El análisis se guarda firmado con el modelo que lo
+ * generó, y firmarlo con el que se pidió sería una mentira pequeña pero de las
+ * que luego confunden al comparar dos resultados distintos.
+ */
+async function generarConModelo<T>(
   apiKey: string,
   modelo: string,
   prompt: string,
   schema: object,
   archivos?: ArchivoInline[]
-): Promise<T> {
+): Promise<{ dato: T; modeloUsado: string }> {
   verificarClave(apiKey);
-  // Si el modelo elegido se satura, se reintenta con el de respaldo antes de
-  // rendirse: más vale una respuesta de un modelo algo más ligero que un error.
-  const cola = modelo === MODELO_RESPALDO ? [modelo] : [modelo, MODELO_RESPALDO];
+  // Si el modelo elegido no responde se baja por la cascada antes de rendirse:
+  // más vale una respuesta de un modelo algo más lento que un error.
+  const cola = colaDeModelos(modelo);
   let ultimo: unknown;
+  let probados = 0;
 
   for (const actual of cola) {
+    probados++;
     for (let intento = 0; intento <= REINTENTOS; intento++) {
       try {
         const texto = await llamarProxy(apiKey, actual, prompt, schema, archivos);
@@ -229,17 +283,32 @@ async function generarJSON<T>(
           emitir({ tipo: "respaldo", modeloOriginal: modelo, modeloUsado: actual });
         const dato = JSON.parse(texto) as T;
         emitir({ tipo: "exito" });
-        return dato;
+        return { dato, modeloUsado: actual };
       } catch (e) {
         ultimo = e;
         const clase = clasificar(e);
-        if (clase === "fatal" || clase === "cuotaDiaria") {
+
+        // Una clave inválida o un bloqueo de seguridad no mejoran cambiando de
+        // modelo: insistir solo hace perder tiempo.
+        if (clase === "fatal") {
           const err = e instanceof ErrorGemini ? e : traducirError(e);
           emitir({ tipo: "fallo", mensaje: err.message });
           throw err;
         }
+
+        // La cuota gratuita de Gemini se cuenta POR MODELO: agotar Flash Lite
+        // no agota Flash ni Pro. Antes esto abortaba la cola entera y tiraba el
+        // día cuando bastaba con bajar un escalón. Un modelo que no existe para
+        // esta clave tampoco merece reintentos: se salta y punto.
+        if (clase === "cuotaDiaria" || clase === "modeloNoDisponible") break;
+
         // El límite por minuto se reintenta menos veces: cada espera es larga.
-        const tope = clase === "limitePorMinuto" ? 2 : REINTENTOS;
+        // Y en los modelos de respaldo se insiste menos que en el elegido: si
+        // el primero está saturado, lo que hace falta es bajar rápido por la
+        // cascada, no acampar en cada escalón. Con el presupuesto completo en
+        // los cuatro, el peor caso pasaba de dos minutos mirando un spinner.
+        const tope =
+          clase === "limitePorMinuto" ? 2 : probados === 1 ? REINTENTOS : REINTENTOS_RESPALDO;
         if (intento >= tope) break;
         const espera = esperaDe(clase, intento);
         emitir({
@@ -254,8 +323,17 @@ async function generarJSON<T>(
     }
   }
 
-  const fallo =
-    ultimo instanceof ErrorGemini
+  // Si se recorrió la cascada entera, el consejo de "cambia de modelo" sobra:
+  // ya se probaron todos. Decir lo que de verdad pasó evita que el usuario
+  // pierda el rato tocando ajustes que no van a arreglar nada.
+  const agotada = probados > 1 && clasificar(ultimo) === "saturado";
+
+  const fallo = agotada
+    ? new ErrorGemini(
+        `Los ${probados} modelos de Gemini están saturados ahora mismo. La app los probó todos y reintentó en cada uno. Esto pasa en las horas punta del plan gratuito: espera unos minutos y vuelve a darle.`,
+        ultimo
+      )
+    : ultimo instanceof ErrorGemini
       ? ultimo
       : ultimo instanceof SyntaxError
         ? new ErrorGemini(
@@ -264,6 +342,17 @@ async function generarJSON<T>(
         : traducirError(ultimo);
   emitir({ tipo: "fallo", mensaje: fallo.message });
   throw fallo;
+}
+
+async function generarJSON<T>(
+  apiKey: string,
+  modelo: string,
+  prompt: string,
+  schema: object,
+  archivos?: ArchivoInline[]
+): Promise<T> {
+  const { dato } = await generarConModelo<T>(apiKey, modelo, prompt, schema, archivos);
+  return dato;
 }
 
 // ---------------------------------------------------------------- esquemas
@@ -480,17 +569,14 @@ export async function analizarVacante(
   perfil: PerfilMaestro,
   vacante: Vacante
 ): Promise<Analisis> {
-  const bruto = await generarJSON<Omit<Analisis, "generadoEn" | "modelo">>(
-    apiKey,
-    modelo,
-    promptAnalizar(perfil, vacante),
-    esquemaAnalisis
-  );
+  const { dato: bruto, modeloUsado } = await generarConModelo<
+    Omit<Analisis, "generadoEn" | "modelo">
+  >(apiKey, modelo, promptAnalizar(perfil, vacante), esquemaAnalisis);
   return {
     ...bruto,
     puntaje: Math.max(0, Math.min(100, Math.round(bruto.puntaje))),
     generadoEn: new Date().toISOString(),
-    modelo,
+    modelo: modeloUsado,
   };
 }
 
@@ -1097,14 +1183,16 @@ export async function resumirReunion(
   /** Lo que no se pudo convertir a Markdown y viaja como bytes. */
   archivos?: ArchivoInline[]
 ): Promise<ResumenReunion> {
-  const bruto = await generarJSON<Omit<ResumenReunion, "generadoEn" | "modelo">>(
+  const { dato: bruto, modeloUsado } = await generarConModelo<
+    Omit<ResumenReunion, "generadoEn" | "modelo">
+  >(
     apiKey,
     modelo,
     promptReunion(perfil, vacante, reunion, idioma),
     esquemaReunion,
     archivos?.length ? archivos : undefined
   );
-  return { ...bruto, generadoEn: new Date().toISOString(), modelo };
+  return { ...bruto, generadoEn: new Date().toISOString(), modelo: modeloUsado };
 }
 
 /**
@@ -1121,7 +1209,9 @@ export async function analizarDocumento(
   contexto: string,
   fuente: { via: "inline"; mimeType: string; datos: string } | { via: "texto"; texto: string }
 ): Promise<AnalisisDocumento> {
-  const bruto = await generarJSON<Omit<AnalisisDocumento, "generadoEn" | "modelo">>(
+  const { dato: bruto, modeloUsado } = await generarConModelo<
+    Omit<AnalisisDocumento, "generadoEn" | "modelo">
+  >(
     apiKey,
     modelo,
     promptDocumento(
@@ -1135,5 +1225,5 @@ export async function analizarDocumento(
       ? [{ mimeType: fuente.mimeType, datos: fuente.datos }]
       : undefined
   );
-  return { ...bruto, generadoEn: new Date().toISOString(), modelo };
+  return { ...bruto, generadoEn: new Date().toISOString(), modelo: modeloUsado };
 }
