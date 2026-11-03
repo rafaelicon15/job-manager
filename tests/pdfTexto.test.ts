@@ -128,6 +128,16 @@ test("los números de página sueltos se quitan", async () => {
   assert.ok(!/^\s*12\s*$/m.test(texto));
 });
 
+test("una cifra del documento NO se confunde con un número de página", async () => {
+  // Un PDF que coloca cada palabra por separado deja las cifras solas en su
+  // línea. Borrarlas por parecer paginación es exactamente lo que este módulo
+  // existe para evitar: se perdió el "8" de "con 8 años" en un CV real.
+  const { texto } = await textoDePdf(
+    bufferDe(pdfConTexto(["La retribucion fija es de", "1800", "dolares al mes.", ...LINEAS], true))
+  );
+  assert.match(texto, /1800/, "la cifra estaba en mitad del documento, no es paginación");
+});
+
 test("un archivo que no es un PDF no lanza, solo no es legible", async () => {
   const basura = new TextEncoder().encode("esto no es un pdf ni lo pretende");
   const { legible, bloques } = await textoDePdf(bufferDe(basura));

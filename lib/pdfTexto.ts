@@ -294,10 +294,23 @@ export async function textoDePdf(buf: ArrayBuffer): Promise<PdfExtraido> {
     if (trozo) partes.push(trozo);
   }
 
-  const bruto = partes.join("\n\n");
-  const limpio = limpiarTexto(bruto)
-    // Los números de página sueltos en su propia línea son ruido.
-    .replace(/^\s*\d{1,4}\s*$/gm, "")
+  // Los números de página son ruido, pero quitarlos por "línea que solo tiene
+  // un número" borra cifras del documento. Medido contra un PDF generado con
+  // jsPDF, que coloca cada palabra por separado: el "8" de "con 8 años" acabó
+  // en su propia línea y desapareció del texto. Una cifra que se borra sola es
+  // justo lo que este módulo existe para evitar.
+  //
+  // El número de página vive al principio o al final de su página, nunca en
+  // medio, así que solo se mira ahí y página por página.
+  const sinPaginacion = partes.map((pagina) => {
+    const lineas = pagina.split("\n");
+    const esNumero = (l: string) => /^\s*\d{1,4}\s*$/.test(l);
+    while (lineas.length && esNumero(lineas[0])) lineas.shift();
+    while (lineas.length && esNumero(lineas.at(-1)!)) lineas.pop();
+    return lineas.join("\n");
+  });
+
+  const limpio = limpiarTexto(sinPaginacion.join("\n\n"))
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
